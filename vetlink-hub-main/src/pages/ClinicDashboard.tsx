@@ -6,6 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import AddVeterinarianModal from "@/components/modals/AddVeterinarianModal";
+import NewAppointmentModal from "@/components/modals/NewAppointmentModal";
+import AppointmentDetailsModal from "@/components/modals/AppointmentDetailsModal";
+import EditAppointmentModal from "@/components/modals/EditAppointmentModal";
+import { VeterinarianScheduleModal } from "@/components/modals/VeterinarianScheduleModal";
+import { EditVeterinarianModal } from "@/components/modals/EditVeterinarianModal";
 import { 
   Calendar,
   Users,
@@ -24,11 +32,22 @@ import {
   FileText,
   UserPlus,
   Search,
-  Filter
+  Filter,
+  LogOut
 } from "lucide-react";
 
 const ClinicDashboard = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [showAddVetModal, setShowAddVetModal] = useState(false);
+  const [showNewAppointmentModal, setShowNewAppointmentModal] = useState(false);
+  const [showAppointmentDetailsModal, setShowAppointmentDetailsModal] = useState(false);
+  const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
+  const [showVetScheduleModal, setShowVetScheduleModal] = useState(false);
+  const [showEditVetModal, setShowEditVetModal] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<typeof appointments[0] | undefined>();
+  const [selectedVeterinarian, setSelectedVeterinarian] = useState<typeof veterinarians[0] | null>(null);
 
   // Mock data
   const clinicData = {
@@ -56,18 +75,18 @@ const ClinicDashboard = () => {
   ];
 
   const veterinarians = [
-    { id: 1, name: "Dra. Maria Oliveira", specialty: "Clínica Geral", crmv: "CRMV-SP 12345", status: "online" },
-    { id: 2, name: "Dr. João Santos", specialty: "Cirurgia", crmv: "CRMV-SP 67890", status: "busy" },
-    { id: 3, name: "Dra. Ana Costa", specialty: "Cardiologia", crmv: "CRMV-SP 11111", status: "offline" }
+    { id: 1, name: "Dra. Maria Oliveira", specialty: "Clínica Geral", crmv: "CRMV-SP 12345", status: "Ativo", email: "maria@petcare.com", phone: "(11) 98888-8888" },
+    { id: 2, name: "Dr. João Santos", specialty: "Cirurgia", crmv: "CRMV-SP 67890", status: "Ativo", email: "joao@petcare.com", phone: "(11) 97777-7777" },
+    { id: 3, name: "Dra. Ana Costa", specialty: "Cardiologia", crmv: "CRMV-SP 11111", status: "Férias", email: "ana@petcare.com", phone: "(11) 96666-6666" }
   ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "confirmed": return "bg-vet-success/10 text-vet-success border-vet-success/20";
       case "pending": return "bg-vet-warning/10 text-vet-warning border-vet-warning/20";
-      case "online": return "bg-vet-success/10 text-vet-success border-vet-success/20";
-      case "busy": return "bg-vet-warning/10 text-vet-warning border-vet-warning/20";
-      case "offline": return "bg-vet-neutral/10 text-vet-neutral border-vet-neutral/20";
+      case "Ativo": return "bg-vet-success/10 text-vet-success border-vet-success/20";
+      case "Inativo": return "bg-vet-neutral/10 text-vet-neutral border-vet-neutral/20";
+      case "Férias": return "bg-vet-warning/10 text-vet-warning border-vet-warning/20";
       default: return "bg-vet-neutral/10 text-vet-neutral border-vet-neutral/20";
     }
   };
@@ -93,13 +112,29 @@ const ClinicDashboard = () => {
             </div>
             
             <div className="flex items-center gap-3">
-              <Button variant="vetOutline" size="sm">
+              <Button 
+                variant="vetOutline" 
+                size="sm"
+                onClick={() => navigate("/clinica/notificacoes")}
+              >
                 <Bell className="h-4 w-4 mr-2" />
                 Notificações
               </Button>
-              <Button variant="vet" size="sm">
+              <Button 
+                variant="vet" 
+                size="sm"
+                onClick={() => navigate("/clinica/configuracoes")}
+              >
                 <Settings className="h-4 w-4 mr-2" />
                 Configurações
+              </Button>
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={logout}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sair
               </Button>
             </div>
           </div>
@@ -143,7 +178,7 @@ const ClinicDashboard = () => {
             <Card className="p-6 bg-white/80 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-foreground">Agendamentos de Hoje</h3>
-                <Button variant="vet" size="sm">
+                <Button variant="vet" size="sm" onClick={() => setShowNewAppointmentModal(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Novo Agendamento
                 </Button>
@@ -168,7 +203,14 @@ const ClinicDashboard = () => {
                       <Badge className={`${getStatusColor(appointment.status)}`}>
                         {appointment.status === 'confirmed' ? 'Confirmado' : 'Pendente'}
                       </Badge>
-                      <Button variant="vetOutline" size="sm">
+                      <Button 
+                        variant="vetOutline" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedAppointment(appointment);
+                          setShowEditAppointmentModal(true);
+                        }}
+                      >
                         <Edit className="h-4 w-4" />
                       </Button>
                     </div>
@@ -191,7 +233,7 @@ const ClinicDashboard = () => {
                   <Filter className="h-4 w-4 mr-2" />
                   Filtros
                 </Button>
-                <Button variant="vet">
+                <Button variant="vet" onClick={() => setShowNewAppointmentModal(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Novo Agendamento
                 </Button>
@@ -218,11 +260,25 @@ const ClinicDashboard = () => {
                       <Badge className={`${getStatusColor(appointment.status)}`}>
                         {appointment.status === 'confirmed' ? 'Confirmado' : 'Pendente'}
                       </Badge>
-                      <Button variant="vetOutline" size="sm">
+                      <Button 
+                        variant="vetOutline" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedAppointment(appointment);
+                          setShowAppointmentDetailsModal(true);
+                        }}
+                      >
                         <Eye className="h-4 w-4 mr-2" />
                         Detalhes
                       </Button>
-                      <Button variant="vetOutline" size="sm">
+                      <Button 
+                        variant="vetOutline" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedAppointment(appointment);
+                          setShowEditAppointmentModal(true);
+                        }}
+                      >
                         <Edit className="h-4 w-4 mr-2" />
                         Editar
                       </Button>
@@ -237,7 +293,7 @@ const ClinicDashboard = () => {
           <TabsContent value="veterinarians" className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-foreground">Equipe Veterinária</h2>
-              <Button variant="vet">
+              <Button variant="vet" onClick={() => setShowAddVetModal(true)}>
                 <UserPlus className="h-4 w-4 mr-2" />
                 Adicionar Veterinário
               </Button>
@@ -259,15 +315,31 @@ const ClinicDashboard = () => {
                     <p className="text-sm text-vet-neutral mb-4">{vet.crmv}</p>
                     
                     <Badge className={`${getStatusColor(vet.status)} mb-4`}>
-                      {vet.status === 'online' ? 'Online' : vet.status === 'busy' ? 'Ocupado' : 'Offline'}
+                      {vet.status}
                     </Badge>
                     
                     <div className="flex gap-2">
-                      <Button variant="vetOutline" size="sm" className="flex-1">
+                      <Button 
+                        variant="vetOutline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => {
+                          setSelectedVeterinarian(vet);
+                          setShowEditVetModal(true);
+                        }}
+                      >
                         <Edit className="h-4 w-4 mr-2" />
                         Editar
                       </Button>
-                      <Button variant="vet" size="sm" className="flex-1">
+                      <Button 
+                        variant="vet" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => {
+                          setSelectedVeterinarian(vet);
+                          setShowVetScheduleModal(true);
+                        }}
+                      >
                         <Calendar className="h-4 w-4 mr-2" />
                         Agenda
                       </Button>
@@ -346,14 +418,17 @@ const ClinicDashboard = () => {
           <TabsContent value="reports" className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-foreground">Relatórios</h2>
-              <Button variant="vet">
+              <Button variant="vet" onClick={() => navigate("/relatorios/gerar")}>
                 <FileText className="h-4 w-4 mr-2" />
                 Gerar Relatório
               </Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card className="p-6 bg-white/80 backdrop-blur-sm hover:shadow-lg transition-shadow cursor-pointer">
+              <Card 
+                className="p-6 bg-white/80 backdrop-blur-sm hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => navigate("/relatorios/mensal")}
+              >
                 <div className="text-center">
                   <div className="p-4 bg-vet-primary/10 rounded-full w-fit mx-auto mb-4">
                     <Calendar className="h-8 w-8 text-vet-primary" />
@@ -366,7 +441,10 @@ const ClinicDashboard = () => {
                 </div>
               </Card>
 
-              <Card className="p-6 bg-white/80 backdrop-blur-sm hover:shadow-lg transition-shadow cursor-pointer">
+              <Card 
+                className="p-6 bg-white/80 backdrop-blur-sm hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => navigate("/relatorios/clientes")}
+              >
                 <div className="text-center">
                   <div className="p-4 bg-vet-success/10 rounded-full w-fit mx-auto mb-4">
                     <Users className="h-8 w-8 text-vet-success" />
@@ -379,7 +457,10 @@ const ClinicDashboard = () => {
                 </div>
               </Card>
 
-              <Card className="p-6 bg-white/80 backdrop-blur-sm hover:shadow-lg transition-shadow cursor-pointer">
+              <Card 
+                className="p-6 bg-white/80 backdrop-blur-sm hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => navigate("/relatorios/financeiro")}
+              >
                 <div className="text-center">
                   <div className="p-4 bg-vet-secondary/10 rounded-full w-fit mx-auto mb-4">
                     <DollarSign className="h-8 w-8 text-vet-secondary" />
@@ -395,6 +476,36 @@ const ClinicDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Modals */}
+      <AddVeterinarianModal 
+        open={showAddVetModal} 
+        onOpenChange={setShowAddVetModal} 
+      />
+      <NewAppointmentModal 
+        open={showNewAppointmentModal} 
+        onOpenChange={setShowNewAppointmentModal} 
+      />
+      <AppointmentDetailsModal 
+        open={showAppointmentDetailsModal} 
+        onOpenChange={setShowAppointmentDetailsModal}
+        appointment={selectedAppointment}
+      />
+      <EditAppointmentModal 
+        open={showEditAppointmentModal} 
+        onOpenChange={setShowEditAppointmentModal}
+        appointment={selectedAppointment}
+      />
+      <VeterinarianScheduleModal 
+        open={showVetScheduleModal} 
+        onOpenChange={setShowVetScheduleModal}
+        veterinarian={selectedVeterinarian}
+      />
+      <EditVeterinarianModal 
+        open={showEditVetModal} 
+        onOpenChange={setShowEditVetModal}
+        veterinarian={selectedVeterinarian}
+      />
     </div>
   );
 };

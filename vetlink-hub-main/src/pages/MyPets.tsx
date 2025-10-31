@@ -6,9 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, PawPrint, Calendar, Syringe, Heart, FileText, Camera } from "lucide-react";
+import { Plus, PawPrint, Calendar, Syringe, Heart, FileText, Camera, Pencil, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import EditPetModal from "@/components/modals/EditPetModal";
+import DeletePetDialog from "@/components/modals/DeletePetDialog";
 
 const MyPets = () => {
+  const navigate = useNavigate();
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedPet, setSelectedPet] = useState<any>(null);
+  
   const pets = [
     {
       id: 1,
@@ -121,6 +130,10 @@ const MyPets = () => {
                       <option>Fêmea</option>
                     </select>
                   </div>
+                  <div>
+                    <Label htmlFor="microchip">Microchip (opcional)</Label>
+                    <Input placeholder="Ex: 985141001234567" />
+                  </div>
                   <Button variant="vet" className="w-full">
                     <Camera className="h-4 w-4 mr-2" />
                     Cadastrar Pet
@@ -150,10 +163,33 @@ const MyPets = () => {
                             {pet.status}
                           </Badge>
                         </div>
-                        <Button variant="vetOutline" size="sm">
-                          <FileText className="h-4 w-4 mr-2" />
-                          Ver Prontuário
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedPet(pet);
+                              setEditModalOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => {
+                              setSelectedPet(pet);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Button variant="vetOutline" size="sm" onClick={() => navigate(`/prontuario?pet=${pet.id}`)}>
+                            <FileText className="h-4 w-4 mr-2" />
+                            Ver Prontuário
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="grid md:grid-cols-3 gap-4 pt-4 border-t border-border/30">
@@ -183,15 +219,15 @@ const MyPets = () => {
                       </div>
 
                       <div className="flex gap-3 pt-2">
-                        <Button variant="vet" size="sm" className="flex-1">
+                        <Button variant="vet" size="sm" className="flex-1" onClick={() => navigate("/agendar")}>
                           <Calendar className="h-4 w-4 mr-2" />
                           Agendar Consulta
                         </Button>
-                        <Button variant="vetOutline" size="sm" className="flex-1">
+                        <Button variant="vetOutline" size="sm" className="flex-1" onClick={() => navigate(`/vacinas?pet=${pet.id}`)}>
                           <Syringe className="h-4 w-4 mr-2" />
                           Vacinas
                         </Button>
-                        <Button variant="vetOutline" size="sm" className="flex-1">
+                        <Button variant="vetOutline" size="sm" className="flex-1" onClick={() => navigate(`/historico?pet=${pet.id}`)}>
                           <Heart className="h-4 w-4 mr-2" />
                           Histórico
                         </Button>
@@ -250,6 +286,25 @@ const MyPets = () => {
           </div>
         </div>
       </div>
+
+      {selectedPet && (
+        <>
+          <EditPetModal 
+            open={editModalOpen}
+            onOpenChange={setEditModalOpen}
+            pet={selectedPet}
+          />
+          <DeletePetDialog
+            open={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
+            petName={selectedPet.name}
+            onConfirm={() => {
+              console.log("Excluindo pet:", selectedPet.name);
+              setDeleteDialogOpen(false);
+            }}
+          />
+        </>
+      )}
 
       <Footer />
     </div>

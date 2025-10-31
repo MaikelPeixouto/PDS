@@ -2,8 +2,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Star, Clock, Phone, Calendar } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface ClinicCardProps {
+  id: string;
   name: string;
   rating: number;
   reviews: number;
@@ -17,6 +19,7 @@ interface ClinicCardProps {
 }
 
 const ClinicCard = ({ 
+  id,
   name, 
   rating, 
   reviews, 
@@ -28,8 +31,11 @@ const ClinicCard = ({
   image, 
   isOpen 
 }: ClinicCardProps) => {
+  const navigate = useNavigate();
+
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 border-border/50 bg-white/80 backdrop-blur-sm">
+    <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 border-border/50 bg-white/80 backdrop-blur-sm cursor-pointer"
+      onClick={() => navigate(`/clinica/${id}`)}>
       <div className="relative h-48 overflow-hidden">
         <img 
           src={image} 
@@ -85,10 +91,26 @@ const ClinicCard = ({
           </div>
           
           <div className="flex gap-2">
-            <Button variant="vetOutline" size="sm" className="flex-1">
+            <Button 
+              variant="vetOutline" 
+              size="sm" 
+              className="flex-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/clinica/${id}`);
+              }}
+            >
               Ver Detalhes
             </Button>
-            <Button variant="vet" size="sm" className="flex-1">
+            <Button 
+              variant="vet" 
+              size="sm" 
+              className="flex-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/clinica/${id}#booking`);
+              }}
+            >
               <Calendar className="h-4 w-4 mr-2" />
               Agendar
             </Button>

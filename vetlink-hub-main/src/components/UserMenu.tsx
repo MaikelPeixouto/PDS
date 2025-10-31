@@ -8,7 +8,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { User, Settings, LogOut } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface UserMenuProps {
   userType: "tutor" | "clinic";
@@ -18,7 +19,7 @@ interface UserMenuProps {
 }
 
 const UserMenu = ({ userType, userName, userEmail, avatarUrl }: UserMenuProps) => {
-  const navigate = useNavigate();
+  const { logout } = useAuth();
   
   const initials = userName
     .split(" ")
@@ -26,10 +27,6 @@ const UserMenu = ({ userType, userName, userEmail, avatarUrl }: UserMenuProps) =
     .join("")
     .toUpperCase()
     .slice(0, 2);
-
-  const handleLogout = () => {
-    navigate("/login");
-  };
 
   return (
     <DropdownMenu>
@@ -66,7 +63,7 @@ const UserMenu = ({ userType, userName, userEmail, avatarUrl }: UserMenuProps) =
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
+        <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Sair</span>
         </DropdownMenuItem>

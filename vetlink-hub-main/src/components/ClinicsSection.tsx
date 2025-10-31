@@ -5,6 +5,7 @@ import clinic3 from "@/assets/clinic-3.jpg";
 
 const clinics = [
   {
+    id: "1",
     name: "Clínica Veterinária PetCare",
     rating: 4.9,
     reviews: 127,
@@ -17,6 +18,7 @@ const clinics = [
     isOpen: true
   },
   {
+    id: "2",
     name: "Hospital Veterinário AnimalCare",
     rating: 4.8,
     reviews: 98,
@@ -29,6 +31,7 @@ const clinics = [
     isOpen: true
   },
   {
+    id: "3",
     name: "Centro Veterinário Vida Animal",
     rating: 4.7,
     reviews: 156,

@@ -6,10 +6,19 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Heart, Building2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 
 const Login = () => {
   const [userType, setUserType] = useState<"user" | "clinic">("user");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const { login } = useAuth();
+
+  const handleLogin = () => {
+    const authType = userType === "user" ? "tutor" : "clinic";
+    login(email, password, authType);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-vet-soft to-vet-light">
@@ -63,6 +72,8 @@ const Login = () => {
                   type="email"
                   placeholder="seu@email.com"
                   className="h-12"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
 
@@ -73,6 +84,8 @@ const Login = () => {
                   type="password"
                   placeholder="••••••••"
                   className="h-12"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
 
@@ -98,13 +111,7 @@ const Login = () => {
               <Button 
                 className="w-full h-12" 
                 variant="vet"
-                onClick={() => {
-                  if (userType === "clinic") {
-                    window.location.href = "/dashboard-clinica";
-                  } else {
-                    window.location.href = "/meus-pets";
-                  }
-                }}
+                onClick={handleLogin}
               >
                 Entrar
               </Button>
