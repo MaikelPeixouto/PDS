@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const notificationController_1 = require("../controllers/notificationController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const router = (0, express_1.Router)();
+router.get('/me/notifications', authMiddleware_1.authMiddleware, authMiddleware_1.requireClinicAuth, notificationController_1.getNotificationsController);
+router.put('/me/notifications/:id/read', authMiddleware_1.authMiddleware, authMiddleware_1.requireClinicAuth, notificationController_1.markAsReadController);
+router.put('/me/notifications/read-all', authMiddleware_1.authMiddleware, authMiddleware_1.requireClinicAuth, notificationController_1.markAllAsReadController);
+router.get('/me/notifications/unread-count', authMiddleware_1.authMiddleware, authMiddleware_1.requireClinicAuth, notificationController_1.getUnreadCountController);
+router.get('/me/notification-preferences', authMiddleware_1.authMiddleware, authMiddleware_1.requireClinicAuth, notificationController_1.getNotificationPreferencesController);
+router.put('/me/notification-preferences', authMiddleware_1.authMiddleware, authMiddleware_1.requireClinicAuth, notificationController_1.updateNotificationPreferencesController);
+exports.default = router;
