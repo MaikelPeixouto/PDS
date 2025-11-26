@@ -33,7 +33,7 @@ const HistoryDetailsModal = ({ open, onOpenChange, consultation, petName }: Hist
         <DialogHeader>
           <DialogTitle>Detalhes da Consulta</DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-6 pt-4">
           <div className="flex items-center gap-3">
             <div className="bg-vet-primary/10 p-3 rounded-lg">
@@ -81,17 +81,8 @@ const HistoryDetailsModal = ({ open, onOpenChange, consultation, petName }: Hist
               <FileText className="h-5 w-5 text-vet-primary mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-foreground mb-1">Observações e Diagnóstico</p>
-                <p className="text-sm text-vet-neutral">{consultation.notes}</p>
+                <p className="text-sm text-vet-neutral">{consultation.notes || "Sem observações"}</p>
               </div>
-            </div>
-
-            <div className="bg-vet-primary/5 p-4 rounded-lg">
-              <p className="text-sm font-medium text-foreground mb-2">Prescrições</p>
-              <ul className="text-sm text-vet-neutral space-y-1 list-disc list-inside">
-                <li>Repouso por 48 horas</li>
-                <li>Medicação via oral 2x ao dia</li>
-                <li>Retorno em 7 dias para reavaliação</li>
-              </ul>
             </div>
           </div>
         </div>

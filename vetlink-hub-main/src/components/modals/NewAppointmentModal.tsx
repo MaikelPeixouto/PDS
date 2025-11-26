@@ -11,6 +11,9 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import api from "@/services/api";
 
 interface NewAppointmentModalProps {
   open: boolean;
@@ -18,6 +21,7 @@ interface NewAppointmentModalProps {
 }
 
 const NewAppointmentModal = ({ open, onOpenChange }: NewAppointmentModalProps) => {
+  const { user } = useAuth();
   const [date, setDate] = useState<Date>();
   const [formData, setFormData] = useState({
     clientName: "",
@@ -30,10 +34,22 @@ const NewAppointmentModal = ({ open, onOpenChange }: NewAppointmentModalProps) =
     notes: ""
   });
 
+  const { data: veterinariansData = [], isLoading: veterinariansLoading } = useQuery({
+    queryKey: ['veterinarians', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return await api.getVeterinarians(user.id);
+    },
+    enabled: !!user?.id && open,
+  });
+
+  const veterinarians = Array.isArray(veterinariansData)
+    ? veterinariansData.filter((vet: any) => vet && vet.id && String(vet.id).trim() !== '')
+    : [];
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Novo agendamento:", { ...formData, date });
-    // Aqui você implementaria a lógica de criar o agendamento
     onOpenChange(false);
   };
 
@@ -170,9 +186,21 @@ const NewAppointmentModal = ({ open, onOpenChange }: NewAppointmentModalProps) =
                   <SelectValue placeholder="Selecione o veterinário" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="maria">Dra. Maria Oliveira</SelectItem>
-                  <SelectItem value="joao">Dr. João Santos</SelectItem>
-                  <SelectItem value="ana">Dra. Ana Costa</SelectItem>
+                  {veterinariansLoading ? (
+                    <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                  ) : veterinarians.length === 0 ? (
+                    <SelectItem value="no-vet" disabled>Nenhum veterinário cadastrado</SelectItem>
+                  ) : (
+                    veterinarians.map((vet: any) => {
+                      const vetId = String(vet.id || '').trim();
+                      if (!vetId) return null;
+                      return (
+                        <SelectItem key={vet.id} value={vetId}>
+                          {vet.first_name || ''} {vet.last_name || ''} - {vet.specialty || 'Sem especialidade'}
+                        </SelectItem>
+                      );
+                    }).filter(Boolean)
+                  )}
                 </SelectContent>
               </Select>
             </div>

@@ -10,7 +10,8 @@ interface VaccineDetailsModalProps {
     date: string;
     next: string;
     status: string;
-    vet: string;
+    notes?: string;
+    [key: string]: any;
   };
   petName: string;
 }
@@ -22,7 +23,7 @@ const VaccineDetailsModal = ({ open, onOpenChange, vaccine, petName }: VaccineDe
         <DialogHeader>
           <DialogTitle>Detalhes da Vacina</DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-6 pt-4">
           <div className="flex items-center gap-3">
             <div className="bg-vet-secondary/10 p-3 rounded-lg">
@@ -36,7 +37,7 @@ const VaccineDetailsModal = ({ open, onOpenChange, vaccine, petName }: VaccineDe
 
           <div className="flex items-center gap-2">
             <span className="text-sm text-vet-neutral">Status:</span>
-            <Badge 
+            <Badge
               variant={vaccine.status === "Em dia" ? "default" : "destructive"}
               className={vaccine.status === "Em dia" ? "bg-green-100 text-green-800" : ""}
             >
@@ -57,28 +58,21 @@ const VaccineDetailsModal = ({ open, onOpenChange, vaccine, petName }: VaccineDe
               <Calendar className="h-5 w-5 text-vet-secondary mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-foreground mb-1">Próxima Dose</p>
-                <p className="text-sm text-vet-neutral">{vaccine.next}</p>
+                <p className="text-sm text-vet-neutral">{vaccine.next || "Não agendada"}</p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3">
-              <User className="h-5 w-5 text-vet-primary mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground mb-1">Veterinário Responsável</p>
-                <p className="text-sm text-vet-neutral">{vaccine.vet}</p>
+            {vaccine.notes && (
+              <div className="flex items-start gap-3">
+                <FileText className="h-5 w-5 text-vet-primary mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-foreground mb-1">Observações</p>
+                  <p className="text-sm text-vet-neutral">
+                    {vaccine.notes}
+                  </p>
+                </div>
               </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <FileText className="h-5 w-5 text-vet-primary mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground mb-1">Observações</p>
-                <p className="text-sm text-vet-neutral">
-                  Vacina aplicada conforme protocolo. Animal apresentou boa reação. 
-                  Recomenda-se manter o pet em observação por 24 horas após a aplicação.
-                </p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </DialogContent>

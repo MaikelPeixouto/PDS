@@ -1,72 +1,105 @@
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import ClinicCard from "./ClinicCard";
 import clinic1 from "@/assets/clinic-1.jpg";
-import clinic2 from "@/assets/clinic-2.jpg";
-import clinic3 from "@/assets/clinic-3.jpg";
+import api from "@/services/api";
 
-const clinics = [
-  {
-    id: "1",
-    name: "Clínica Veterinária PetCare",
-    rating: 4.9,
-    reviews: 127,
-    distance: "1.2 km",
-    address: "Rua das Flores, 123 - Centro, São Paulo - SP",
-    phone: "(11) 9999-8888",
-    openUntil: "22:00",
-    specialties: ["Clínica Geral", "Cirurgia", "Emergência 24h"],
-    image: clinic1,
-    isOpen: true
-  },
-  {
-    id: "2",
-    name: "Hospital Veterinário AnimalCare",
-    rating: 4.8,
-    reviews: 98,
-    distance: "2.1 km",
-    address: "Av. Principal, 456 - Jardins, São Paulo - SP",
-    phone: "(11) 8888-7777",
-    openUntil: "18:00",
-    specialties: ["Cardiologia", "Dermatologia", "Oftalmologia"],
-    image: clinic2,
-    isOpen: true
-  },
-  {
-    id: "3",
-    name: "Centro Veterinário Vida Animal",
-    rating: 4.7,
-    reviews: 156,
-    distance: "3.5 km",
-    address: "Rua Verde, 789 - Vila Nova, São Paulo - SP",
-    phone: "(11) 7777-6666",
-    openUntil: "20:00",
-    specialties: ["Oncologia", "Neurologia", "Fisioterapia"],
-    image: clinic3,
-    isOpen: false
-  }
-];
+interface ClinicsSectionProps {
+  searchResults?: any[] | null;
+  isSearchMode?: boolean;
+  onViewAll?: () => void;
+}
 
-const ClinicsSection = () => {
+const ClinicsSection = ({ searchResults, isSearchMode = false, onViewAll }: ClinicsSectionProps) => {
+  const [allClinics, setAllClinics] = useState<any[]>([]);
+  const [isLoadingAll, setIsLoadingAll] = useState(false);
+
+  const { data: defaultClinics = [], isLoading: isLoadingDefault } = useQuery({
+    queryKey: ['clinics', 'default'],
+    queryFn: async () => {
+      const clinics = await api.getClinics({ limit: 10 });
+      return clinics;
+    },
+    enabled: !isSearchMode,
+  });
+
+  const handleViewAllClick = async () => {
+    if (isSearchMode && onViewAll) {
+      setIsLoadingAll(true);
+      try {
+        const clinics = await api.getClinics({ limit: 100 });
+        setAllClinics(clinics);
+        if (onViewAll) {
+          onViewAll();
+        }
+      } catch (error) {
+        console.error('Error loading all clinics:', error);
+      } finally {
+        setIsLoadingAll(false);
+      }
+    } else if (onViewAll) {
+      onViewAll();
+    }
+  };
+
+  const formatClinicForCard = (clinic: any) => {
+    return {
+      id: clinic.id || clinic.place_id || `clinic-${Math.random()}`,
+      name: clinic.name,
+      rating: clinic.rating || 0,
+      reviews: clinic.total_reviews || clinic.user_ratings_total || 0,
+      distance: clinic.distance || "N/A",
+      address: clinic.address || clinic.vicinity || "Endereço não disponível",
+      phone: clinic.phone || "Telefone não disponível",
+      openUntil: clinic.hours || "Horário não disponível",
+      specialties: clinic.specialties || [],
+      image: clinic.photo_url || clinic1,
+      isOpen: clinic.is_open !== undefined ? clinic.is_open : true,
+      isRegistered: clinic.isRegistered !== undefined ? clinic.isRegistered : true
+    };
+  };
+
+  const clinicsToShow = isSearchMode && searchResults
+    ? searchResults.map(formatClinicForCard)
+    : isSearchMode && allClinics.length > 0
+    ? allClinics.map(formatClinicForCard)
+    : defaultClinics.map(formatClinicForCard);
+
   return (
-    <section className="py-20 bg-white/50">
+    <section id="clinics-section" className="py-20 bg-white/50">
       <div className="container mx-auto px-4">
         <div className="text-center space-y-4 mb-12">
           <h2 className="text-4xl font-bold text-foreground">
-            Clínicas veterinárias próximas a você
+            {isSearchMode ? "Resultados da busca" : "Clínicas veterinárias próximas a você"}
           </h2>
           <p className="text-xl text-vet-neutral">
-            Encontre os melhores profissionais da sua região
+            {isSearchMode ? "Clínicas encontradas na região" : "Encontre os melhores profissionais da sua região"}
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {clinics.map((clinic, index) => (
-            <ClinicCard key={index} {...clinic} />
-          ))}
-        </div>
+        {isLoadingDefault && !isSearchMode ? (
+          <div className="text-center py-12">
+            <p className="text-vet-neutral text-lg">Carregando clínicas...</p>
+          </div>
+        ) : clinicsToShow.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-vet-neutral text-lg">Nenhuma clínica encontrada</p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {clinicsToShow.map((clinic, index) => (
+              <ClinicCard key={clinic.id || index} {...clinic} />
+            ))}
+          </div>
+        )}
 
         <div className="text-center mt-12">
-          <button className="text-vet-primary hover:text-vet-secondary font-semibold text-lg hover:underline transition-colors">
-            Ver todas as clínicas →
+          <button
+            onClick={handleViewAllClick}
+            disabled={isLoadingAll}
+            className="text-vet-primary hover:text-vet-secondary font-semibold text-lg hover:underline transition-colors disabled:opacity-50"
+          >
+            {isLoadingAll ? "Carregando..." : isSearchMode ? "Ver todas as clínicas cadastradas →" : "Ver todas as clínicas →"}
           </button>
         </div>
       </div>

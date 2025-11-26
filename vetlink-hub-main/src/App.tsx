@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { setAuthErrorHandler } from "./services/api";
+import { toast } from "sonner";
 import Index from "./pages/Index";
 import Schedule from "./pages/Schedule";
 import MyPets from "./pages/MyPets";
@@ -26,6 +28,12 @@ import FinancialReport from "./pages/reports/FinancialReport";
 import GenerateReport from "./pages/reports/GenerateReport";
 
 const queryClient = new QueryClient();
+
+setAuthErrorHandler((message: string) => {
+  toast.error(message, {
+    duration: 5000,
+  });
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -54,7 +62,7 @@ const App = () => (
             <Route path="/relatorios/clientes" element={<ClientsReport />} />
             <Route path="/relatorios/financeiro" element={<FinancialReport />} />
             <Route path="/relatorios/gerar" element={<GenerateReport />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            {}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

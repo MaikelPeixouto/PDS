@@ -24,7 +24,6 @@ export function VeterinarianScheduleModal({
 }: VeterinarianScheduleModalProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
-  // Mock data - substituir por dados reais
   const appointments = [
     {
       id: 1,

@@ -17,7 +17,7 @@ const Header = () => {
             </div>
             <h1 className="text-2xl font-bold text-foreground">VetFinder</h1>
           </Link>
-          
+
           <nav className="hidden md:flex items-center gap-6">
             <Link to="/" className="flex items-center gap-2 text-vet-neutral hover:text-vet-primary transition-colors">
               <Search className="h-4 w-4" />
@@ -31,10 +31,12 @@ const Header = () => {
               <PawPrint className="h-4 w-4" />
               Meus Pets
             </Link>
-            <Link to="/para-clinicas" className="flex items-center gap-2 text-vet-neutral hover:text-vet-primary transition-colors">
-              <Building2 className="h-4 w-4" />
-              Para Clínicas
-            </Link>
+            {!isLoggedIn && (
+              <Link to="/para-clinicas" className="flex items-center gap-2 text-vet-neutral hover:text-vet-primary transition-colors">
+                <Building2 className="h-4 w-4" />
+                Para Clínicas
+              </Link>
+            )}
           </nav>
 
           <div className="flex items-center gap-3">

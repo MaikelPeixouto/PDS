@@ -7,11 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  UserPlus, 
-  Trash2, 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import api from "@/services/api";
+import {
+  UserPlus,
+  Trash2,
   Mail,
   Shield,
   Check,
@@ -25,7 +27,7 @@ interface RolePermission {
 }
 
 interface TeamMember {
-  id: number;
+  id: string;
   name: string;
   email: string;
   avatar?: string;
@@ -48,36 +50,121 @@ export function RolePermissionsModal({
   role,
 }: RolePermissionsModalProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [newMemberName, setNewMemberName] = useState("");
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>(
     role?.permissions.map(p => p.id) || []
   );
 
+  useEffect(() => {
+    if (role) {
+      const firstMember = role.members[0];
+      if (firstMember) {
+        setSelectedPermissions(role.permissions.map(p => p.id));
+      } else {
+        setSelectedPermissions(role.permissions.map(p => p.id));
+      }
+    }
+  }, [role]);
+
+  const createMemberMutation = useMutation({
+    mutationFn: async (data: { email: string; name: string; role: string; permissions: string[] }) => {
+      return await api.createTeamMember({
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        permissions: data.permissions.map(id => ({ id, enabled: true })),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teamMembers'] });
+      toast({
+        title: "Membro adicionado",
+        description: `${newMemberName} foi adicionado à equipe`,
+      });
+      setNewMemberEmail("");
+      setNewMemberName("");
+      setShowAddMember(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao adicionar membro",
+        description: error.message || "Não foi possível adicionar o membro.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMemberMutation = useMutation({
+    mutationFn: async (memberId: string) => {
+      return await api.deleteTeamMember(memberId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teamMembers'] });
+      toast({
+        title: "Membro removido",
+        description: "O membro foi removido da equipe",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao remover membro",
+        description: error.message || "Não foi possível remover o membro.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePermissionsMutation = useMutation({
+    mutationFn: async ({ memberId, permissions }: { memberId: string; permissions: string[] }) => {
+      return await api.updateTeamMemberPermissions(memberId, permissions.map(id => ({ id, enabled: true })));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teamMembers'] });
+      toast({
+        title: "Permissões atualizadas",
+        description: "As permissões foram salvas com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atualizar permissões",
+        description: error.message || "Não foi possível atualizar as permissões.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleAddMember = () => {
-    if (!newMemberEmail) return;
-    
-    toast({
-      title: "Membro adicionado",
-      description: `Convite enviado para ${newMemberEmail}`,
+    if (!newMemberEmail || !newMemberName || !role) return;
+
+    createMemberMutation.mutate({
+      email: newMemberEmail,
+      name: newMemberName,
+      role: role.name.toLowerCase(),
+      permissions: selectedPermissions,
     });
-    setNewMemberEmail("");
-    setShowAddMember(false);
   };
 
   const handleRemoveMember = (member: TeamMember) => {
-    toast({
-      title: "Membro removido",
-      description: `${member.name} foi removido desta função`,
-    });
+    deleteMemberMutation.mutate(member.id);
   };
 
   const handleSavePermissions = () => {
-    toast({
-      title: "Permissões atualizadas",
-      description: "As permissões foram salvas com sucesso.",
+    if (!role) return;
+
+    const updatePromises = role.members.map(member =>
+      updatePermissionsMutation.mutateAsync({
+        memberId: member.id,
+        permissions: selectedPermissions,
+      })
+    );
+
+    Promise.all(updatePromises).then(() => {
+      onOpenChange(false);
     });
-    onOpenChange(false);
   };
 
   const togglePermission = (permissionId: string) => {
@@ -104,7 +191,7 @@ export function RolePermissionsModal({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Permissions Section */}
+          {}
           <div>
             <h3 className="font-semibold text-foreground mb-3">Permissões de Acesso</h3>
             <Card className="p-4">
@@ -118,7 +205,7 @@ export function RolePermissionsModal({
                       className="mt-1"
                     />
                     <div className="flex-1">
-                      <Label 
+                      <Label
                         htmlFor={permission.id}
                         className="font-medium cursor-pointer"
                       >
@@ -141,14 +228,14 @@ export function RolePermissionsModal({
 
           <Separator />
 
-          {/* Members Section */}
+          {}
           <div>
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-foreground">
                 Membros ({role.members.length})
               </h3>
-              <Button 
-                variant="vetOutline" 
+              <Button
+                variant="vetOutline"
                 size="sm"
                 onClick={() => setShowAddMember(!showAddMember)}
               >
@@ -157,10 +244,19 @@ export function RolePermissionsModal({
               </Button>
             </div>
 
-            {/* Add Member Form */}
+            {}
             {showAddMember && (
               <Card className="p-4 mb-4 border-vet-primary/30">
                 <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="member-name">Nome do Membro</Label>
+                    <Input
+                      id="member-name"
+                      placeholder="Nome completo"
+                      value={newMemberName}
+                      onChange={(e) => setNewMemberName(e.target.value)}
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="member-email">E-mail do Membro</Label>
                     <div className="flex gap-2">
@@ -171,8 +267,12 @@ export function RolePermissionsModal({
                         value={newMemberEmail}
                         onChange={(e) => setNewMemberEmail(e.target.value)}
                       />
-                      <Button variant="vet" onClick={handleAddMember}>
-                        Convidar
+                      <Button
+                        variant="vet"
+                        onClick={handleAddMember}
+                        disabled={createMemberMutation.isPending}
+                      >
+                        {createMemberMutation.isPending ? "Adicionando..." : "Adicionar"}
                       </Button>
                     </div>
                   </div>
@@ -180,7 +280,7 @@ export function RolePermissionsModal({
               </Card>
             )}
 
-            {/* Members List */}
+            {}
             <div className="space-y-2">
               {role.members.map((member) => (
                 <Card key={member.id} className="p-4">
@@ -204,6 +304,7 @@ export function RolePermissionsModal({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRemoveMember(member)}
+                      disabled={deleteMemberMutation.isPending}
                     >
                       <Trash2 className="h-4 w-4 text-vet-error" />
                     </Button>
@@ -225,8 +326,12 @@ export function RolePermissionsModal({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button variant="vet" onClick={handleSavePermissions}>
-            Salvar Alterações
+          <Button
+            variant="vet"
+            onClick={handleSavePermissions}
+            disabled={updatePermissionsMutation.isPending}
+          >
+            {updatePermissionsMutation.isPending ? "Salvando..." : "Salvar Alterações"}
           </Button>
         </DialogFooter>
       </DialogContent>

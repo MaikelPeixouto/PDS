@@ -110,7 +110,7 @@ const ForClinics = () => {
     <div className="min-h-screen bg-background">
       <Header />
       
-      {/* Hero Section */}
+      {}
       <section className="py-20 bg-gradient-to-br from-vet-primary/10 via-background to-vet-secondary/10">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
@@ -153,7 +153,7 @@ const ForClinics = () => {
         </div>
       </section>
 
-      {/* Cadastro */}
+      {}
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
@@ -305,7 +305,7 @@ const ForClinics = () => {
         </div>
       </section>
 
-      {/* Planos */}
+      {}
       <section className="py-20 bg-gradient-to-b from-background to-vet-primary/5">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">

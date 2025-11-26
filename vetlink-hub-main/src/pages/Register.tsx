@@ -8,14 +8,113 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Heart, Building2, User, Phone, MapPin, Clock } from "lucide-react";
 import Header from "@/components/Header";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Register = () => {
   const [userType, setUserType] = useState<"user" | "clinic">("user");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const { registerUser, registerClinic } = useAuth();
+
+  const [userForm, setUserForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+    cpf: "",
+  });
+
+  const [clinicForm, setClinicForm] = useState({
+    name: "",
+    cnpj: "",
+    email: "",
+    phone: "",
+    address: "",
+    description: "",
+    hours: "",
+    password: "",
+    confirmPassword: "",
+  });
+
+  const handleUserRegister = async () => {
+    if (!userForm.firstName || !userForm.lastName || !userForm.email || !userForm.password) {
+      setError("Por favor, preencha todos os campos obrigatórios");
+      return;
+    }
+
+    if (userForm.password !== userForm.confirmPassword) {
+      setError("As senhas não coincidem");
+      return;
+    }
+
+    if (userForm.password.length < 6) {
+      setError("A senha deve ter pelo menos 6 caracteres");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      await registerUser({
+        email: userForm.email,
+        password: userForm.password,
+        firstName: userForm.firstName,
+        lastName: userForm.lastName,
+        phone: userForm.phone || undefined,
+        cpf: userForm.cpf || undefined,
+      });
+    } catch (err: any) {
+      setError(err.message || "Erro ao criar conta. Tente novamente.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClinicRegister = async () => {
+    if (!clinicForm.name || !clinicForm.cnpj || !clinicForm.email || !clinicForm.password) {
+      setError("Por favor, preencha todos os campos obrigatórios");
+      return;
+    }
+
+    if (clinicForm.password !== clinicForm.confirmPassword) {
+      setError("As senhas não coincidem");
+      return;
+    }
+
+    if (clinicForm.password.length < 6) {
+      setError("A senha deve ter pelo menos 6 caracteres");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      await registerClinic({
+        email: clinicForm.email,
+        password: clinicForm.password,
+        name: clinicForm.name,
+        cnpj: clinicForm.cnpj.replace(/\D/g, ""),
+        phone: clinicForm.phone || undefined,
+        address: clinicForm.address || undefined,
+        description: clinicForm.description || undefined,
+        hours: clinicForm.hours || undefined,
+        specialties: [],
+      });
+    } catch (err: any) {
+      setError(err.message || "Erro ao criar conta da clínica. Tente novamente.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-vet-soft to-vet-light">
       <Header />
-      
+
       <div className="container mx-auto px-4 pt-24 pb-12">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
@@ -57,8 +156,13 @@ const Register = () => {
             </CardHeader>
 
             <CardContent className="space-y-6">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm">
+                  {error}
+                </div>
+              )}
+
               {userType === "user" ? (
-                // Formulário para Tutores
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -67,6 +171,8 @@ const Register = () => {
                         id="firstName"
                         placeholder="Seu nome"
                         className="h-12"
+                        value={userForm.firstName}
+                        onChange={(e) => setUserForm({ ...userForm, firstName: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
@@ -75,6 +181,8 @@ const Register = () => {
                         id="lastName"
                         placeholder="Seu sobrenome"
                         className="h-12"
+                        value={userForm.lastName}
+                        onChange={(e) => setUserForm({ ...userForm, lastName: e.target.value })}
                       />
                     </div>
                   </div>
@@ -86,6 +194,8 @@ const Register = () => {
                       type="email"
                       placeholder="seu@email.com"
                       className="h-12"
+                      value={userForm.email}
+                      onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
                     />
                   </div>
 
@@ -96,6 +206,19 @@ const Register = () => {
                       type="tel"
                       placeholder="(11) 99999-9999"
                       className="h-12"
+                      value={userForm.phone}
+                      onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cpf">CPF (opcional)</Label>
+                    <Input
+                      id="cpf"
+                      placeholder="000.000.000-00"
+                      className="h-12"
+                      value={userForm.cpf}
+                      onChange={(e) => setUserForm({ ...userForm, cpf: e.target.value })}
                     />
                   </div>
 
@@ -107,6 +230,8 @@ const Register = () => {
                         type="password"
                         placeholder="••••••••"
                         className="h-12"
+                        value={userForm.password}
+                        onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
@@ -116,12 +241,13 @@ const Register = () => {
                         type="password"
                         placeholder="••••••••"
                         className="h-12"
+                        value={userForm.confirmPassword}
+                        onChange={(e) => setUserForm({ ...userForm, confirmPassword: e.target.value })}
                       />
                     </div>
                   </div>
                 </div>
               ) : (
-                // Formulário para Clínicas
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="clinicName">Nome da Clínica</Label>
@@ -129,6 +255,8 @@ const Register = () => {
                       id="clinicName"
                       placeholder="Nome da sua clínica veterinária"
                       className="h-12"
+                      value={clinicForm.name}
+                      onChange={(e) => setClinicForm({ ...clinicForm, name: e.target.value })}
                     />
                   </div>
 
@@ -138,6 +266,8 @@ const Register = () => {
                       id="cnpj"
                       placeholder="00.000.000/0000-00"
                       className="h-12"
+                      value={clinicForm.cnpj}
+                      onChange={(e) => setClinicForm({ ...clinicForm, cnpj: e.target.value })}
                     />
                   </div>
 
@@ -149,6 +279,8 @@ const Register = () => {
                         type="email"
                         placeholder="contato@clinica.com"
                         className="h-12"
+                        value={clinicForm.email}
+                        onChange={(e) => setClinicForm({ ...clinicForm, email: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
@@ -158,6 +290,8 @@ const Register = () => {
                         type="tel"
                         placeholder="(11) 3333-3333"
                         className="h-12"
+                        value={clinicForm.phone}
+                        onChange={(e) => setClinicForm({ ...clinicForm, phone: e.target.value })}
                       />
                     </div>
                   </div>
@@ -168,6 +302,8 @@ const Register = () => {
                       id="address"
                       placeholder="Rua, número, bairro, cidade, CEP"
                       className="h-12"
+                      value={clinicForm.address}
+                      onChange={(e) => setClinicForm({ ...clinicForm, address: e.target.value })}
                     />
                   </div>
 
@@ -177,6 +313,8 @@ const Register = () => {
                       id="description"
                       placeholder="Descreva os serviços oferecidos pela sua clínica..."
                       className="min-h-[100px]"
+                      value={clinicForm.description}
+                      onChange={(e) => setClinicForm({ ...clinicForm, description: e.target.value })}
                     />
                   </div>
 
@@ -186,6 +324,8 @@ const Register = () => {
                       id="hours"
                       placeholder="Segunda a Sexta: 8h às 18h"
                       className="h-12"
+                      value={clinicForm.hours}
+                      onChange={(e) => setClinicForm({ ...clinicForm, hours: e.target.value })}
                     />
                   </div>
 
@@ -197,6 +337,8 @@ const Register = () => {
                         type="password"
                         placeholder="••••••••"
                         className="h-12"
+                        value={clinicForm.password}
+                        onChange={(e) => setClinicForm({ ...clinicForm, password: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
@@ -206,6 +348,8 @@ const Register = () => {
                         type="password"
                         placeholder="••••••••"
                         className="h-12"
+                        value={clinicForm.confirmPassword}
+                        onChange={(e) => setClinicForm({ ...clinicForm, confirmPassword: e.target.value })}
                       />
                     </div>
                   </div>
@@ -230,21 +374,16 @@ const Register = () => {
                 </Label>
               </div>
 
-              <Button 
-                className="w-full h-12" 
+              <Button
+                className="w-full h-12"
                 variant="vet"
-                onClick={() => {
-                  // Simulação de cadastro bem-sucedido
-                  if (userType === "clinic") {
-                    alert("Cadastro realizado com sucesso! Você será redirecionado para o dashboard.");
-                    window.location.href = "/dashboard-clinica";
-                  } else {
-                    alert("Cadastro realizado com sucesso! Você será redirecionado para seus pets.");
-                    window.location.href = "/meus-pets";
-                  }
-                }}
+                onClick={userType === "user" ? handleUserRegister : handleClinicRegister}
+                disabled={isLoading}
               >
-                {userType === "user" ? "Criar Conta de Tutor" : "Cadastrar Clínica"}
+                {isLoading
+                  ? (userType === "user" ? "Criando conta..." : "Cadastrando clínica...")
+                  : (userType === "user" ? "Criar Conta de Tutor" : "Cadastrar Clínica")
+                }
               </Button>
 
               <div className="text-center">

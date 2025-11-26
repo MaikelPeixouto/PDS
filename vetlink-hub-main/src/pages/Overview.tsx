@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 
 const Overview = () => {
-  // Mock data
   const todayStats = {
     consultations: 23,
     revenue: "R$ 3.240",
@@ -158,7 +157,7 @@ const Overview = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-vet-primary/5 via-background to-vet-secondary/5">
-      {/* Header */}
+      {}
       <header className="bg-white/80 backdrop-blur-sm border-b border-border sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -183,9 +182,9 @@ const Overview = () => {
 
       <div className="container mx-auto px-6 py-8">
         <div className="grid grid-cols-12 gap-6">
-          {/* Left Column - Main Stats and Appointments */}
+          {}
           <div className="col-span-8 space-y-6">
-            {/* Stats Cards */}
+            {}
             <div className="grid grid-cols-4 gap-4">
               <Card className="bg-white/80 backdrop-blur-sm">
                 <CardContent className="p-4">
@@ -244,7 +243,7 @@ const Overview = () => {
               </Card>
             </div>
 
-            {/* Upcoming Appointments */}
+            {}
             <Card className="bg-white/80 backdrop-blur-sm">
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -306,9 +305,9 @@ const Overview = () => {
             </Card>
           </div>
 
-          {/* Right Column - Messages and Alerts */}
+          {}
           <div className="col-span-4 space-y-6">
-            {/* Alerts */}
+            {}
             <Card className="bg-white/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -339,7 +338,7 @@ const Overview = () => {
               </CardContent>
             </Card>
 
-            {/* Recent Messages */}
+            {}
             <Card className="bg-white/80 backdrop-blur-sm">
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -398,7 +397,7 @@ const Overview = () => {
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
+            {}
             <Card className="bg-white/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

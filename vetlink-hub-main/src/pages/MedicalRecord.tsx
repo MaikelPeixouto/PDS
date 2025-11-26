@@ -6,68 +6,146 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Heart, Weight, Calendar, Syringe, FileText, AlertCircle } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { format, parseISO, isBefore, isAfter } from "date-fns";
+import { ptBR } from "date-fns/locale/pt-BR";
+import api from "@/services/api";
 
 const MedicalRecord = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const petId = searchParams.get("pet") || "1";
+  const petId = searchParams.get("pet");
 
-  const petData = {
-    "1": {
-      name: "Zeus",
-      breed: "Golden Retriever",
-      age: "3 anos",
-      weight: "32 kg",
-      gender: "Macho",
-      microchip: "985141001234567",
-      image: "🐕",
-      status: "Saudável",
-      vaccines: [
-        { name: "V10", date: "12 Dez 2023", next: "12 Dez 2024", status: "Em dia" },
-        { name: "Antirrábica", date: "15 Nov 2023", next: "15 Nov 2024", status: "Em dia" }
-      ],
-      consultations: [
-        { date: "20 Dez 2023", vet: "Dra. Ana Silva", reason: "Check-up", notes: "Animal saudável, sem alterações" }
-      ],
-      medications: [
-        { name: "Vermífugo", dosage: "1 comprimido", frequency: "A cada 3 meses", lastDate: "15 Out 2023" }
-      ],
-      allergies: ["Nenhuma alergia conhecida"],
-      conditions: []
+  const { data: pet, isLoading: isLoadingPet, error: petError } = useQuery({
+    queryKey: ['pet', petId],
+    queryFn: () => api.getPet(petId!),
+    enabled: !!petId,
+  });
+
+  const { data: vaccines = [], isLoading: isLoadingVaccines, refetch: refetchVaccines } = useQuery({
+    queryKey: ['vaccines', petId],
+    queryFn: async () => {
+      const vaccinesData = await api.getVaccines(petId!);
+      console.log('MedicalRecord - Vaccines fetched:', vaccinesData);
+      return vaccinesData;
     },
-    "2": {
-      name: "Luna",
-      breed: "Gato Persa",
-      age: "2 anos",
-      weight: "4.2 kg",
-      gender: "Fêmea",
-      microchip: "985141001234568",
-      image: "🐱",
-      status: "Acompanhamento",
-      vaccines: [
-        { name: "V4 Felina", date: "05 Jan 2024", next: "05 Jan 2025", status: "Em dia" }
-      ],
-      consultations: [
-        { date: "18 Nov 2023", vet: "Dra. Ana Silva", reason: "Consulta", notes: "Tratamento para conjuntivite" }
-      ],
-      medications: [
-        { name: "Colírio", dosage: "2 gotas", frequency: "3x ao dia", lastDate: "18 Nov 2023" }
-      ],
-      allergies: [],
-      conditions: ["Conjuntivite crônica"]
-    }
-  };
+    enabled: !!petId,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+  });
 
-  const pet = petData[petId as keyof typeof petData] || petData["1"];
+  const { data: appointments = [], isLoading: isLoadingAppointments } = useQuery({
+    queryKey: ['userAppointments'],
+    queryFn: async () => {
+      try {
+        const apps = await api.getAppointments();
+        return apps || [];
+      } catch (error) {
+        console.error("Error fetching appointments:", error);
+        return [];
+      }
+    },
+  });
+
+  const formattedVaccines = vaccines.map((vaccine: any) => {
+    const vaccinationDate = vaccine.vaccination_date ? parseISO(vaccine.vaccination_date) : null;
+    const nextDate = vaccine.next_vaccination_date ? parseISO(vaccine.next_vaccination_date) : null;
+    const today = new Date();
+
+    let status = "Em dia";
+    if (nextDate && isBefore(nextDate, today)) {
+      status = "Vencida";
+    } else if (nextDate && isAfter(nextDate, today)) {
+      status = "Em dia";
+    }
+
+    return {
+      ...vaccine,
+      date: vaccinationDate ? format(vaccinationDate, "dd MMM yyyy", { locale: ptBR }) : "N/A",
+      next: nextDate ? format(nextDate, "dd MMM yyyy", { locale: ptBR }) : "Não agendada",
+      status,
+    };
+  });
+
+  const consultations = appointments
+    .filter((apt: any) => {
+      if (apt.pet_id !== petId) return false;
+      const aptDate = new Date(apt.appointment_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      aptDate.setHours(0, 0, 0, 0);
+      return apt.status === "completed" || aptDate < today;
+    })
+    .sort((a: any, b: any) => {
+      const dateA = new Date(a.appointment_date);
+      const dateB = new Date(b.appointment_date);
+      return dateB.getTime() - dateA.getTime();
+    })
+    .map((apt: any) => ({
+      date: format(new Date(apt.appointment_date), "dd MMM yyyy", { locale: ptBR }),
+      vet: apt.veterinarian_name || "N/A",
+      reason: apt.service_name || "Consulta",
+      notes: apt.notes || "Sem observações",
+    }));
+
+  const petImage = pet?.species === "Gato" ? "🐱" : pet?.species === "Cão" ? "🐕" : "🐾";
+
+  if (!petId) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <Card className="p-6 text-center">
+            <p className="text-vet-neutral mb-4">Pet não especificado</p>
+            <Button variant="vet" onClick={() => navigate("/meus-pets")}>
+              Voltar para Meus Pets
+            </Button>
+          </Card>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (isLoadingPet) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <Card className="p-6 text-center">
+            <p className="text-vet-neutral">Carregando informações do pet...</p>
+          </Card>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (petError || !pet) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <Card className="p-6 text-center">
+            <p className="text-vet-neutral mb-4">Erro ao carregar informações do pet</p>
+            <Button variant="vet" onClick={() => navigate("/meus-pets")}>
+              Voltar para Meus Pets
+            </Button>
+          </Card>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => navigate("/meus-pets")}
             className="mb-6"
           >
@@ -75,10 +153,10 @@ const MedicalRecord = () => {
             Voltar para Meus Pets
           </Button>
 
-          {/* Header do Prontuário */}
+          {}
           <Card className="p-6 mb-6 bg-gradient-to-br from-vet-primary/10 to-vet-secondary/10 border-border/50">
             <div className="flex items-start gap-6">
-              <div className="text-6xl">{pet.image}</div>
+              <div className="text-6xl">{petImage}</div>
               <div className="flex-1">
                 <div className="flex items-start justify-between mb-4">
                   <div>
@@ -86,7 +164,7 @@ const MedicalRecord = () => {
                       Prontuário - {pet.name}
                     </h1>
                     <p className="text-lg text-vet-neutral mb-2">{pet.breed}</p>
-                    <Badge 
+                    <Badge
                       variant={pet.status === "Saudável" ? "default" : "secondary"}
                       className={pet.status === "Saudável" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}
                     >
@@ -111,16 +189,18 @@ const MedicalRecord = () => {
                     <p className="text-xs text-vet-neutral mb-1">Sexo</p>
                     <p className="text-sm font-semibold text-foreground">{pet.gender}</p>
                   </div>
-                  <div className="bg-white/60 p-3 rounded-lg">
-                    <p className="text-xs text-vet-neutral mb-1">Microchip</p>
-                    <p className="text-sm font-semibold text-foreground">••••••{pet.microchip.slice(-4)}</p>
-                  </div>
+                  {pet.microchip && (
+                    <div className="bg-white/60 p-3 rounded-lg">
+                      <p className="text-xs text-vet-neutral mb-1">Microchip</p>
+                      <p className="text-sm font-semibold text-foreground">••••••{pet.microchip.slice(-4)}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </Card>
 
-          {/* Abas do Prontuário */}
+          {}
           <Tabs defaultValue="geral" className="space-y-6">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="geral">Geral</TabsTrigger>
@@ -135,17 +215,7 @@ const MedicalRecord = () => {
                   <Heart className="h-5 w-5 text-vet-warm" />
                   Condições de Saúde
                 </h3>
-                {pet.conditions.length > 0 ? (
-                  <div className="space-y-2">
-                    {pet.conditions.map((condition, index) => (
-                      <div key={index} className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                        <p className="text-sm text-foreground">{condition}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-vet-neutral">Nenhuma condição de saúde registrada</p>
-                )}
+                <p className="text-vet-neutral">Nenhuma condição de saúde registrada</p>
               </Card>
 
               <Card className="p-6 bg-white/80 backdrop-blur-sm border-border/50">
@@ -153,85 +223,84 @@ const MedicalRecord = () => {
                   <AlertCircle className="h-5 w-5 text-red-500" />
                   Alergias
                 </h3>
-                {pet.allergies.length > 0 ? (
-                  <div className="space-y-2">
-                    {pet.allergies.map((allergy, index) => (
-                      <div key={index} className="bg-red-50 p-3 rounded-lg border border-red-200">
-                        <p className="text-sm text-foreground">{allergy}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-vet-neutral">Nenhuma alergia registrada</p>
-                )}
+                <p className="text-vet-neutral">Nenhuma alergia registrada</p>
               </Card>
             </TabsContent>
 
             <TabsContent value="vacinas" className="space-y-4">
-              {pet.vaccines.map((vaccine, index) => (
-                <Card key={index} className="p-6 bg-white/80 backdrop-blur-sm border-border/50">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="bg-vet-secondary/10 p-3 rounded-lg">
-                        <Syringe className="h-5 w-5 text-vet-secondary" />
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-bold text-foreground mb-1">{vaccine.name}</h4>
-                        <div className="flex items-center gap-4 text-sm">
-                          <span className="text-vet-neutral">Aplicada em: {vaccine.date}</span>
-                          <span className="text-vet-neutral">Próxima: {vaccine.next}</span>
+              {isLoadingVaccines ? (
+                <Card className="p-6 text-center">
+                  <p className="text-vet-neutral">Carregando vacinas...</p>
+                </Card>
+              ) : formattedVaccines.length === 0 ? (
+                <Card className="p-6 text-center">
+                  <p className="text-vet-neutral">Nenhuma vacina cadastrada</p>
+                </Card>
+              ) : (
+                formattedVaccines.map((vaccine: any) => (
+                  <Card key={vaccine.id} className="p-6 bg-white/80 backdrop-blur-sm border-border/50">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="bg-vet-secondary/10 p-3 rounded-lg">
+                          <Syringe className="h-5 w-5 text-vet-secondary" />
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-bold text-foreground mb-1">{vaccine.name}</h4>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="text-vet-neutral">Aplicada em: {vaccine.date}</span>
+                            <span className="text-vet-neutral">Próxima: {vaccine.next}</span>
+                          </div>
                         </div>
                       </div>
+                      <Badge className={vaccine.status === "Em dia" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                        {vaccine.status}
+                      </Badge>
                     </div>
-                    <Badge className={vaccine.status === "Em dia" ? "bg-green-100 text-green-800" : ""}>
-                      {vaccine.status}
-                    </Badge>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                ))
+              )}
             </TabsContent>
 
             <TabsContent value="consultas" className="space-y-4">
-              {pet.consultations.map((consultation, index) => (
-                <Card key={index} className="p-6 bg-white/80 backdrop-blur-sm border-border/50">
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className="bg-vet-primary/10 p-3 rounded-lg">
-                      <FileText className="h-5 w-5 text-vet-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-lg font-bold text-foreground mb-1">{consultation.reason}</h4>
-                      <div className="flex items-center gap-4 text-sm text-vet-neutral">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {consultation.date}
-                        </span>
-                        <span>{consultation.vet}</span>
+              {isLoadingAppointments ? (
+                <Card className="p-6 text-center">
+                  <p className="text-vet-neutral">Carregando consultas...</p>
+                </Card>
+              ) : consultations.length === 0 ? (
+                <Card className="p-6 text-center">
+                  <p className="text-vet-neutral">Nenhuma consulta registrada</p>
+                </Card>
+              ) : (
+                consultations.map((consultation: any, index: number) => (
+                  <Card key={index} className="p-6 bg-white/80 backdrop-blur-sm border-border/50">
+                    <div className="flex items-start gap-4 mb-4">
+                      <div className="bg-vet-primary/10 p-3 rounded-lg">
+                        <FileText className="h-5 w-5 text-vet-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-lg font-bold text-foreground mb-1">{consultation.reason}</h4>
+                        <div className="flex items-center gap-4 text-sm text-vet-neutral">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {consultation.date}
+                          </span>
+                          <span>{consultation.vet}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-xs text-vet-neutral mb-1">Observações</p>
-                    <p className="text-sm text-foreground">{consultation.notes}</p>
-                  </div>
-                </Card>
-              ))}
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <p className="text-xs text-vet-neutral mb-1">Observações</p>
+                      <p className="text-sm text-foreground">{consultation.notes}</p>
+                    </div>
+                  </Card>
+                ))
+              )}
             </TabsContent>
 
             <TabsContent value="medicamentos" className="space-y-4">
-              {pet.medications.map((medication, index) => (
-                <Card key={index} className="p-6 bg-white/80 backdrop-blur-sm border-border/50">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-lg font-bold text-foreground mb-2">{medication.name}</h4>
-                      <div className="space-y-1 text-sm">
-                        <p className="text-vet-neutral">Dosagem: <span className="text-foreground font-medium">{medication.dosage}</span></p>
-                        <p className="text-vet-neutral">Frequência: <span className="text-foreground font-medium">{medication.frequency}</span></p>
-                        <p className="text-vet-neutral">Última aplicação: <span className="text-foreground font-medium">{medication.lastDate}</span></p>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
+              <Card className="p-6 text-center">
+                <p className="text-vet-neutral">Nenhum medicamento registrado</p>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>

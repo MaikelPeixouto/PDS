@@ -1,9 +1,90 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MapPin, Search, Star } from "lucide-react";
+import { MapPin, Search, Star, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import heroImage from "@/assets/hero-vet.jpg";
+import api from "@/services/api";
 
-const HeroSection = () => {
+interface HeroSectionProps {
+  onSearchResults?: (results: any[]) => void;
+}
+
+const HeroSection = ({ onSearchResults }: HeroSectionProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+
+  const validateCep = (cep: string): boolean => {
+    const cleanCep = cep.replace(/\D/g, '');
+    return cleanCep.length === 8;
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      toast.error("Por favor, digite um CEP ou cidade");
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const cleanQuery = searchQuery.replace(/\D/g, '');
+      let latitude: number | undefined;
+      let longitude: number | undefined;
+
+      if (cleanQuery.length === 8) {
+        const cepData = await api.getCepCoordinates(cleanQuery);
+        if (!cepData.latitude || !cepData.longitude) {
+          toast.error("Não foi possível obter as coordenadas para este CEP");
+          setIsSearching(false);
+          return;
+        }
+        latitude = cepData.latitude;
+        longitude = cepData.longitude;
+      } else {
+        toast.error("Por favor, digite um CEP válido (8 dígitos)");
+        setIsSearching(false);
+        return;
+      }
+
+      const [registeredClinics, externalClinics] = await Promise.all([
+        api.searchClinicsByLocation(latitude, longitude, 10, 3),
+        api.searchExternalClinics(latitude, longitude, 10000, 3)
+      ]);
+
+      const allResults = [...registeredClinics, ...externalClinics];
+
+      const limitedResults = allResults.slice(0, 3);
+
+      if (limitedResults.length === 0) {
+        toast.info("Nenhuma clínica encontrada nesta região");
+      } else {
+        toast.success(`${limitedResults.length} clínica(s) encontrada(s)`);
+      }
+
+      if (onSearchResults) {
+        onSearchResults(limitedResults);
+      }
+
+      setTimeout(() => {
+        const clinicsSection = document.getElementById('clinics-section');
+        if (clinicsSection) {
+          clinicsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    } catch (error: any) {
+      console.error('Error searching clinics:', error);
+      toast.error(error.message || "Erro ao buscar clínicas");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
   return (
     <section className="relative bg-gradient-to-br from-background via-vet-primary/5 to-vet-secondary/10 py-20">
       <div className="container mx-auto px-4">
@@ -18,7 +99,7 @@ const HeroSection = () => {
                 para seu pet
               </h1>
               <p className="text-xl text-vet-neutral leading-relaxed">
-                Conectamos você aos melhores profissionais veterinários da sua região. 
+                Conectamos você aos melhores profissionais veterinários da sua região.
                 Agende consultas, gerencie a saúde do seu pet e tenha tudo em um só lugar.
               </p>
             </div>
@@ -31,14 +112,33 @@ const HeroSection = () => {
                 <div className="flex flex-col sm:flex-row gap-3">
                   <div className="relative flex-1">
                     <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-vet-neutral h-5 w-5" />
-                    <Input 
-                      placeholder="Digite sua cidade ou CEP" 
+                    <Input
+                      placeholder="Digite sua cidade ou CEP"
                       className="pl-10 h-12 border-border/50 focus:border-vet-primary"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      disabled={isSearching}
                     />
                   </div>
-                  <Button variant="vet" size="lg" className="h-12 px-8">
-                    <Search className="h-5 w-5 mr-2" />
-                    Buscar
+                  <Button
+                    variant="vet"
+                    size="lg"
+                    className="h-12 px-8"
+                    onClick={handleSearch}
+                    disabled={isSearching}
+                  >
+                    {isSearching ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Buscando...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="h-5 w-5 mr-2" />
+                        Buscar
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
@@ -66,9 +166,9 @@ const HeroSection = () => {
 
           <div className="relative">
             <div className="relative rounded-3xl overflow-hidden shadow-2xl">
-              <img 
-                src={heroImage} 
-                alt="Veterinário cuidando de um pet" 
+              <img
+                src={heroImage}
+                alt="Veterinário cuidando de um pet"
                 className="w-full h-[600px] object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>

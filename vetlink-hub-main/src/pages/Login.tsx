@@ -13,17 +13,33 @@ const Login = () => {
   const [userType, setUserType] = useState<"user" | "clinic">("user");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
 
-  const handleLogin = () => {
-    const authType = userType === "user" ? "tutor" : "clinic";
-    login(email, password, authType);
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError("Por favor, preencha todos os campos");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const authType = userType === "user" ? "tutor" : "clinic";
+      await login(email, password, authType);
+    } catch (err: any) {
+      setError(err.message || "Erro ao fazer login. Verifique suas credenciais.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-vet-soft to-vet-light">
       <Header />
-      
+
       <div className="container mx-auto px-4 pt-24 pb-12">
         <div className="max-w-md mx-auto">
           <div className="text-center mb-8">
@@ -108,12 +124,19 @@ const Login = () => {
                 </Link>
               </div>
 
-              <Button 
-                className="w-full h-12" 
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm">
+                  {error}
+                </div>
+              )}
+
+              <Button
+                className="w-full h-12"
                 variant="vet"
                 onClick={handleLogin}
+                disabled={isLoading}
               >
-                Entrar
+                {isLoading ? "Entrando..." : "Entrar"}
               </Button>
 
               <div className="text-center">

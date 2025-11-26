@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale/pt-BR";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -12,128 +16,238 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, Star, Clock, Phone, Mail, Calendar as CalendarIcon, Check, ArrowLeft } from "lucide-react";
+import { MapPin, Star, Clock, Phone, Mail, Calendar as CalendarIcon, Check, ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import clinic1 from "@/assets/clinic-1.jpg";
-import clinic2 from "@/assets/clinic-2.jpg";
-import clinic3 from "@/assets/clinic-3.jpg";
-
-// Mock data - in a real app, this would come from an API
-const clinicData: Record<string, any> = {
-  "1": {
-    id: "1",
-    name: "Clínica Veterinária PetCare",
-    rating: 4.8,
-    reviews: 234,
-    address: "Rua das Flores, 123 - Centro, São Paulo - SP",
-    phone: "(11) 3456-7890",
-    email: "contato@petcare.com.br",
-    openUntil: "18h",
-    isOpen: true,
-    specialties: ["Cães", "Gatos", "Emergências", "Cirurgias"],
-    description: "Clínica veterinária especializada em atendimento de pequenos animais com mais de 15 anos de experiência. Nossa equipe é formada por profissionais altamente qualificados e dedicados ao bem-estar do seu pet.",
-    services: [
-      { id: 1, name: "Consulta Veterinária", duration: "30min", price: "R$ 150,00" },
-      { id: 2, name: "Vacinação", duration: "15min", price: "R$ 80,00" },
-      { id: 3, name: "Check-up Completo", duration: "45min", price: "R$ 250,00" },
-      { id: 4, name: "Cirurgia de Castração", duration: "2h", price: "R$ 600,00" },
-    ],
-    veterinarians: [
-      { id: 1, name: "Dra. Ana Silva", crmv: "12345", specialty: "Clínica Geral", avatar: "" },
-      { id: 2, name: "Dr. Carlos Santos", crmv: "23456", specialty: "Cirurgião", avatar: "" },
-      { id: 3, name: "Dra. Maria Oliveira", crmv: "34567", specialty: "Dermatologia", avatar: "" },
-    ],
-    images: [clinic1, clinic2, clinic3],
-    reviews_list: [
-      { id: 1, author: "João Silva", rating: 5, date: "2024-01-15", comment: "Excelente atendimento! A equipe é muito atenciosa e o ambiente é limpo e organizado.", avatar: "" },
-      { id: 2, author: "Maria Santos", rating: 5, date: "2024-01-10", comment: "Minha cachorrinha foi muito bem tratada. Recomendo!", avatar: "" },
-      { id: 3, author: "Pedro Costa", rating: 4, date: "2024-01-05", comment: "Ótima clínica, apenas o tempo de espera foi um pouco longo.", avatar: "" },
-    ],
-  },
-  "2": {
-    id: "2",
-    name: "VetCenter 24h",
-    rating: 4.9,
-    reviews: 456,
-    address: "Av. Paulista, 1000 - Bela Vista, São Paulo - SP",
-    phone: "(11) 2345-6789",
-    email: "contato@vetcenter.com.br",
-    openUntil: "24h",
-    isOpen: true,
-    specialties: ["Emergências 24h", "UTI", "Internação", "Diagnóstico por Imagem"],
-    description: "Centro veterinário de referência com atendimento 24 horas. Equipamentos de última geração e equipe especializada em emergências e cuidados intensivos.",
-    services: [
-      { id: 1, name: "Consulta de Emergência", duration: "30min", price: "R$ 200,00" },
-      { id: 2, name: "Raio-X", duration: "30min", price: "R$ 180,00" },
-      { id: 3, name: "Ultrassom", duration: "45min", price: "R$ 280,00" },
-      { id: 4, name: "Internação (diária)", duration: "24h", price: "R$ 350,00" },
-    ],
-    veterinarians: [
-      { id: 1, name: "Dr. Roberto Lima", crmv: "45678", specialty: "Emergências", avatar: "" },
-      { id: 2, name: "Dra. Paula Mendes", crmv: "56789", specialty: "Diagnóstico", avatar: "" },
-    ],
-    images: [clinic2, clinic1, clinic3],
-    reviews_list: [
-      { id: 1, author: "Ana Paula", rating: 5, date: "2024-01-18", comment: "Salvaram a vida do meu cachorro! Atendimento excepcional.", avatar: "" },
-      { id: 2, author: "Carlos Eduardo", rating: 5, date: "2024-01-12", comment: "Equipe extremamente competente e atenciosa.", avatar: "" },
-    ],
-  },
-  "3": {
-    id: "3",
-    name: "Hospital Veterinário Pet Plus",
-    rating: 4.7,
-    reviews: 189,
-    address: "Rua dos Veterinários, 456 - Jardins, São Paulo - SP",
-    phone: "(11) 4567-8901",
-    email: "contato@petplus.com.br",
-    openUntil: "20h",
-    isOpen: true,
-    specialties: ["Ortopedia", "Cardiologia", "Oncologia", "Fisioterapia"],
-    description: "Hospital veterinário completo com especialidades médicas avançadas. Referência em tratamentos complexos e cirurgias especializadas.",
-    services: [
-      { id: 1, name: "Consulta Especializada", duration: "45min", price: "R$ 280,00" },
-      { id: 2, name: "Ecocardiograma", duration: "30min", price: "R$ 350,00" },
-      { id: 3, name: "Fisioterapia (sessão)", duration: "40min", price: "R$ 120,00" },
-      { id: 4, name: "Cirurgia Ortopédica", duration: "3h", price: "R$ 1.500,00" },
-    ],
-    veterinarians: [
-      { id: 1, name: "Dr. Fernando Costa", crmv: "67890", specialty: "Ortopedia", avatar: "" },
-      { id: 2, name: "Dra. Juliana Rocha", crmv: "78901", specialty: "Cardiologia", avatar: "" },
-    ],
-    images: [clinic3, clinic2, clinic1],
-    reviews_list: [
-      { id: 1, author: "Fernanda Lima", rating: 5, date: "2024-01-20", comment: "Excelentes especialistas! Tratamento de primeira.", avatar: "" },
-      { id: 2, author: "Ricardo Alves", rating: 4, date: "2024-01-14", comment: "Muito bom, apenas os preços são um pouco elevados.", avatar: "" },
-    ],
-  },
-};
-
-const availableSlots = [
-  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
-  "11:00", "11:30", "14:00", "14:30", "15:00", "15:30",
-  "16:00", "16:30", "17:00", "17:30"
-];
+import api from "@/services/api";
 
 const ClinicDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const clinic = clinicData[id || "1"];
+  const { user } = useAuth();
 
+  const { data: clinic, isLoading: isLoadingClinic, error: clinicError } = useQuery({
+    queryKey: ['clinic', id],
+    queryFn: async () => {
+      if (!id) return null;
+      const clinicData = await api.getClinic(id);
+      return clinicData;
+    },
+    enabled: !!id,
+  });
+
+  const { data: services = [], isLoading: isLoadingServices } = useQuery({
+    queryKey: ['services'],
+    queryFn: () => api.getServices(),
+  });
+
+  const { data: veterinarians = [], isLoading: isLoadingVeterinarians } = useQuery({
+    queryKey: ['veterinarians', id],
+    queryFn: () => api.getVeterinarians(id),
+    enabled: !!id,
+  });
+
+  const queryClient = useQueryClient();
+
+  const [selectedPet, setSelectedPet] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedService, setSelectedService] = useState("");
   const [selectedVet, setSelectedVet] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [notes, setNotes] = useState("");
 
-  if (!clinic) {
+  const { data: availableSlots = [], isLoading: isLoadingSlots } = useQuery({
+    queryKey: ['availableSlots', id, selectedDate, selectedVet],
+    queryFn: async () => {
+      if (!id || !selectedDate) return [];
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      const slots = await api.getAvailableTimeSlots(id, dateStr, selectedVet || undefined);
+      return slots || [];
+    },
+    enabled: !!id && !!selectedDate,
+  });
+
+  const { data: pets = [] } = useQuery({
+    queryKey: ["pets"],
+    queryFn: () => api.getPets(),
+  });
+
+  const { data: reviews = [], isLoading: isLoadingReviews, refetch: refetchReviews } = useQuery({
+    queryKey: ['reviews', id],
+    queryFn: async () => {
+      if (!id) return [];
+      const reviewsData = await api.getClinicReviews(id, 50, 0);
+      return reviewsData || [];
+    },
+    enabled: !!id,
+  });
+
+  const { data: userAppointments = [] } = useQuery({
+    queryKey: ["userAppointments"],
+    queryFn: async () => {
+      try {
+        const appointments = await api.getAppointments();
+        return appointments || [];
+      } catch (error) {
+        console.error("Error fetching appointments:", error);
+        return [];
+      }
+    },
+    enabled: !!user,
+  });
+
+  const completedAppointments = userAppointments.filter(
+    (apt: any) => apt.clinic_id === id && apt.status === 'completed'
+  );
+
+  const [reviewRating, setReviewRating] = useState<number>(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [selectedAppointmentForReview, setSelectedAppointmentForReview] = useState<string>("");
+
+  useEffect(() => {
+    if (completedAppointments.length > 0 && !selectedAppointmentForReview) {
+      setSelectedAppointmentForReview(completedAppointments[0].id);
+    }
+  }, [completedAppointments, selectedAppointmentForReview]);
+
+  const { data: existingReview } = useQuery({
+    queryKey: ['userReview', id, user?.id, selectedAppointmentForReview],
+    queryFn: async () => {
+      if (!id || !user || !selectedAppointmentForReview) return null;
+      try {
+        const review = await api.getUserReview(id, selectedAppointmentForReview);
+        return review;
+      } catch (error) {
+        return null;
+      }
+    },
+    enabled: !!id && !!user && !!selectedAppointmentForReview && completedAppointments.length > 0,
+  });
+
+  const createAppointmentMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await api.createAppointment(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pets"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["userAppointments"] });
+      queryClient.invalidateQueries({ queryKey: ["clinicAppointments"] });
+      toast.success("Agendamento criado com sucesso!");
+      navigate("/meus-pets");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Erro ao criar agendamento");
+    },
+  });
+
+  const createReviewMutation = useMutation({
+    mutationFn: async (data: { clinicId: string; appointmentId: string; rating: number; comment: string }) => {
+      return await api.createReview(data.clinicId, data.appointmentId, data.rating, data.comment);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reviews', id] });
+      queryClient.invalidateQueries({ queryKey: ['userReview', id] });
+      queryClient.invalidateQueries({ queryKey: ['clinic', id] });
+      toast.success("Avaliação enviada com sucesso!");
+      setReviewRating(0);
+      setReviewComment("");
+      setSelectedAppointmentForReview("");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Erro ao enviar avaliação");
+    },
+  });
+
+  const formattedServices = services.map((service: any) => ({
+    id: service.id,
+    name: service.name,
+    price: service.price ? `R$ ${parseFloat(service.price).toFixed(2).replace('.', ',')}` : "Preço não informado",
+    duration: service.duration_minutes ? `${service.duration_minutes}min` : "Duração não informada",
+    description: service.description || ""
+  }));
+
+  const formattedVeterinarians = veterinarians.map((vet: any) => ({
+    id: vet.id,
+    name: `${vet.first_name} ${vet.last_name}`,
+    crmv: vet.crmv,
+    specialty: vet.specialty,
+    avatar: ""
+  }));
+
+  const specialties = clinic?.specialties ? (Array.isArray(clinic.specialties) ? clinic.specialties : []) : [];
+
+  const handleBooking = () => {
+    if (!selectedPet || !selectedService || !selectedDate || !selectedTime || !id) {
+      toast.error("Por favor, preencha todos os campos obrigatórios");
+      return;
+    }
+
+    const dateTime = new Date(selectedDate);
+    const [hours, minutes] = selectedTime.split(':');
+    dateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+    createAppointmentMutation.mutate({
+      petId: selectedPet,
+      clinicId: id,
+      serviceId: selectedService,
+      appointmentDate: dateTime.toISOString(),
+      veterinarianId: selectedVet || undefined,
+      notes: notes || undefined,
+    });
+  };
+
+  const handleSubmitReview = () => {
+    if (!reviewRating || reviewRating < 1 || reviewRating > 5) {
+      toast.error("Por favor, selecione uma nota de 1 a 5 estrelas");
+      return;
+    }
+    if (!reviewComment.trim()) {
+      toast.error("Por favor, escreva um comentário");
+      return;
+    }
+    if (!id) {
+      toast.error("Erro: ID da clínica não encontrado");
+      return;
+    }
+
+    const appointmentId = selectedAppointmentForReview || (completedAppointments.length > 0 ? completedAppointments[0].id : "");
+
+    if (!appointmentId) {
+      toast.error("Erro: Nenhuma consulta encontrada");
+      return;
+    }
+
+    createReviewMutation.mutate({
+      clinicId: id,
+      appointmentId: appointmentId,
+      rating: reviewRating,
+      comment: reviewComment.trim(),
+    });
+  };
+
+  if (isLoadingClinic) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="container mx-auto px-4 py-20 text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-vet-primary" />
+          <p className="text-vet-neutral">Carregando informações da clínica...</p>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (clinicError || !clinic) {
     return (
       <div className="min-h-screen">
         <Header />
         <div className="container mx-auto px-4 py-20 text-center">
           <h1 className="text-2xl font-bold mb-4">Clínica não encontrada</h1>
-          <Button onClick={() => navigate("/agendar")}>
+          <Button onClick={() => navigate("/")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Voltar para agendamento
+            Voltar para home
           </Button>
         </div>
         <Footer />
@@ -141,19 +255,10 @@ const ClinicDetails = () => {
     );
   }
 
-  const handleBooking = () => {
-    if (!selectedService || !selectedDate || !selectedTime) {
-      toast.error("Por favor, preencha todos os campos obrigatórios");
-      return;
-    }
-    toast.success("Agendamento realizado com sucesso!");
-    setTimeout(() => navigate("/meus-pets"), 1500);
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <Header />
-      
+
       <main className="container mx-auto px-4 py-8">
         <Button
           variant="ghost"
@@ -164,12 +269,11 @@ const ClinicDetails = () => {
           Voltar
         </Button>
 
-        {/* Hero Section */}
         <Card className="overflow-hidden mb-8">
           <div className="grid md:grid-cols-2 gap-0">
             <div className="relative h-64 md:h-auto">
               <img
-                src={clinic.images[0]}
+                src={clinic.photo_url || clinic1}
                 alt={clinic.name}
                 className="w-full h-full object-cover"
               />
@@ -181,49 +285,58 @@ const ClinicDetails = () => {
                   <div className="flex items-center gap-3 mb-4">
                     <div className="flex items-center gap-1">
                       <Star className="h-5 w-5 fill-vet-accent text-vet-accent" />
-                      <span className="font-semibold text-lg">{clinic.rating}</span>
-                      <span className="text-muted-foreground">({clinic.reviews} avaliações)</span>
+                      <span className="font-semibold text-lg">{clinic.rating || 0}</span>
+                      <span className="text-muted-foreground">({clinic.total_reviews || 0} avaliações)</span>
                     </div>
-                    <Badge variant={clinic.isOpen ? "default" : "destructive"}>
-                      {clinic.isOpen ? "Aberto" : "Fechado"}
+                    <Badge variant={clinic.is_open ? "default" : "destructive"}>
+                      {clinic.is_open ? "Aberto" : "Fechado"}
                     </Badge>
                   </div>
                 </div>
               </div>
 
-              <p className="text-muted-foreground">{clinic.description}</p>
+              <p className="text-muted-foreground">{clinic.description || "Clínica veterinária especializada em cuidados para pets."}</p>
 
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <MapPin className="h-4 w-4 text-vet-primary" />
-                  <span>{clinic.address}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-vet-primary" />
-                  <span>{clinic.phone}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="h-4 w-4 text-vet-primary" />
-                  <span>{clinic.email}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="h-4 w-4 text-vet-primary" />
-                  <span>{clinic.isOpen ? `Aberto até ${clinic.openUntil}` : `Abre amanhã`}</span>
-                </div>
+                {clinic.address && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="h-4 w-4 text-vet-primary" />
+                    <span>{clinic.address}</span>
+                  </div>
+                )}
+                {clinic.phone && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="h-4 w-4 text-vet-primary" />
+                    <span>{clinic.phone}</span>
+                  </div>
+                )}
+                {clinic.email && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Mail className="h-4 w-4 text-vet-primary" />
+                    <span>{clinic.email}</span>
+                  </div>
+                )}
+                {clinic.hours && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="h-4 w-4 text-vet-primary" />
+                    <span>{clinic.hours}</span>
+                  </div>
+                )}
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {clinic.specialties.map((specialty: string, index: number) => (
-                  <Badge key={index} variant="secondary" className="bg-vet-primary/10 text-vet-primary">
-                    {specialty}
-                  </Badge>
-                ))}
-              </div>
+              {specialties.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {specialties.map((specialty: string, index: number) => (
+                    <Badge key={index} variant="secondary" className="bg-vet-primary/10 text-vet-primary">
+                      {specialty}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </Card>
 
-        {/* Tabs */}
         <Tabs defaultValue="booking" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="booking">Agendar</TabsTrigger>
@@ -232,14 +345,33 @@ const ClinicDetails = () => {
             <TabsTrigger value="reviews">Avaliações</TabsTrigger>
           </TabsList>
 
-          {/* Booking Tab */}
           <TabsContent value="booking" className="space-y-6">
             <div className="grid lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
                 <Card className="p-6">
                   <h2 className="text-2xl font-bold mb-6">Agendar Consulta</h2>
-                  
+
                   <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="pet">Selecione seu pet *</Label>
+                      <Select value={selectedPet} onValueChange={setSelectedPet}>
+                        <SelectTrigger id="pet">
+                          <SelectValue placeholder="Escolha um pet" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {pets.length === 0 ? (
+                            <SelectItem value="none" disabled>Nenhum pet cadastrado</SelectItem>
+                          ) : (
+                            pets.map((pet: any) => (
+                              <SelectItem key={pet.id} value={pet.id.toString()}>
+                                {pet.name} {pet.breed ? `(${pet.breed})` : ''}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="service">Serviço *</Label>
                       <Select value={selectedService} onValueChange={setSelectedService}>
@@ -247,11 +379,17 @@ const ClinicDetails = () => {
                           <SelectValue placeholder="Selecione o serviço" />
                         </SelectTrigger>
                         <SelectContent>
-                          {clinic.services.map((service: any) => (
-                            <SelectItem key={service.id} value={service.id.toString()}>
-                              {service.name} - {service.price} ({service.duration})
-                            </SelectItem>
-                          ))}
+                          {isLoadingServices ? (
+                            <SelectItem value="loading" disabled>Carregando serviços...</SelectItem>
+                          ) : formattedServices.length === 0 ? (
+                            <SelectItem value="none" disabled>Nenhum serviço disponível</SelectItem>
+                          ) : (
+                            formattedServices.map((service: any) => (
+                              <SelectItem key={service.id} value={service.id.toString()}>
+                                {service.name} - {service.price} ({service.duration})
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -263,11 +401,17 @@ const ClinicDetails = () => {
                           <SelectValue placeholder="Selecione o veterinário" />
                         </SelectTrigger>
                         <SelectContent>
-                          {clinic.veterinarians.map((vet: any) => (
-                            <SelectItem key={vet.id} value={vet.id.toString()}>
-                              {vet.name} - {vet.specialty}
-                            </SelectItem>
-                          ))}
+                          {isLoadingVeterinarians ? (
+                            <SelectItem value="loading" disabled>Carregando veterinários...</SelectItem>
+                          ) : formattedVeterinarians.length === 0 ? (
+                            <SelectItem value="none" disabled>Nenhum veterinário disponível</SelectItem>
+                          ) : (
+                            formattedVeterinarians.map((vet: any) => (
+                              <SelectItem key={vet.id} value={vet.id.toString()}>
+                                {vet.name} - {vet.specialty}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -285,19 +429,28 @@ const ClinicDetails = () => {
 
                     <div className="space-y-2">
                       <Label>Horário Disponível *</Label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {availableSlots.map((slot) => (
-                          <Button
-                            key={slot}
-                            variant={selectedTime === slot ? "vet" : "outline"}
-                            size="sm"
-                            onClick={() => setSelectedTime(slot)}
-                            className="w-full"
-                          >
-                            {slot}
-                          </Button>
-                        ))}
-                      </div>
+                      {isLoadingSlots ? (
+                        <div className="text-center py-4">
+                          <Loader2 className="h-4 w-4 animate-spin mx-auto text-vet-primary" />
+                          <p className="text-sm text-vet-neutral mt-2">Carregando horários disponíveis...</p>
+                        </div>
+                      ) : availableSlots.length === 0 ? (
+                        <p className="text-sm text-vet-neutral">Nenhum horário disponível para esta data</p>
+                      ) : (
+                        <div className="grid grid-cols-4 gap-2">
+                          {availableSlots.map((slot: string) => (
+                            <Button
+                              key={slot}
+                              variant={selectedTime === slot ? "vet" : "outline"}
+                              size="sm"
+                              onClick={() => setSelectedTime(slot)}
+                              className="w-full"
+                            >
+                              {slot}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -316,28 +469,37 @@ const ClinicDetails = () => {
                       size="lg"
                       className="w-full"
                       onClick={handleBooking}
+                      disabled={createAppointmentMutation.isPending}
                     >
-                      <Check className="mr-2 h-5 w-5" />
-                      Confirmar Agendamento
+                      {createAppointmentMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Agendando...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="mr-2 h-5 w-5" />
+                          Confirmar Agendamento
+                        </>
+                      )}
                     </Button>
                   </div>
                 </Card>
               </div>
 
               <div className="space-y-6">
-                <Card className="p-6">
-                  <h3 className="font-semibold mb-4">Galeria de Fotos</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {clinic.images.map((img: string, index: number) => (
+                {clinic.photo_url && (
+                  <Card className="p-6">
+                    <h3 className="font-semibold mb-4">Foto da Clínica</h3>
+                    <div className="rounded-lg overflow-hidden">
                       <img
-                        key={index}
-                        src={img}
-                        alt={`${clinic.name} - ${index + 1}`}
-                        className="rounded-lg w-full h-24 object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                        src={clinic.photo_url}
+                        alt={clinic.name}
+                        className="w-full h-48 object-cover"
                       />
-                    ))}
-                  </div>
-                </Card>
+                    </div>
+                  </Card>
+                )}
 
                 <Card className="p-6 bg-vet-primary/5">
                   <h3 className="font-semibold mb-3">Dicas para a Consulta</h3>
@@ -352,47 +514,69 @@ const ClinicDetails = () => {
             </div>
           </TabsContent>
 
-          {/* Services Tab */}
           <TabsContent value="services">
             <Card className="p-6">
               <h2 className="text-2xl font-bold mb-6">Serviços Oferecidos</h2>
-              <div className="grid md:grid-cols-2 gap-4">
-                {clinic.services.map((service: any) => (
-                  <Card key={service.id} className="p-4 hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-semibold">{service.name}</h3>
-                      <span className="text-vet-primary font-bold">{service.price}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Duração: {service.duration}</p>
-                  </Card>
-                ))}
-              </div>
+              {isLoadingServices ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-vet-primary mb-2" />
+                  <p className="text-vet-neutral">Carregando serviços...</p>
+                </div>
+              ) : formattedServices.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-vet-neutral">Nenhum serviço disponível</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {formattedServices.map((service: any) => (
+                    <Card key={service.id} className="p-4 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-semibold">{service.name}</h3>
+                        <span className="text-vet-primary font-bold">{service.price}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Duração: {service.duration}</p>
+                      {service.description && (
+                        <p className="text-sm text-muted-foreground mt-2">{service.description}</p>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              )}
             </Card>
           </TabsContent>
 
-          {/* Team Tab */}
           <TabsContent value="team">
             <Card className="p-6">
               <h2 className="text-2xl font-bold mb-6">Nossa Equipe</h2>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {clinic.veterinarians.map((vet: any) => (
-                  <Card key={vet.id} className="p-6 text-center">
-                    <Avatar className="w-24 h-24 mx-auto mb-4">
-                      <AvatarImage src={vet.avatar} />
-                      <AvatarFallback className="text-2xl bg-vet-primary text-white">
-                        {vet.name.split(' ').map((n: string) => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <h3 className="font-bold text-lg mb-1">{vet.name}</h3>
-                    <p className="text-sm text-vet-primary mb-1">{vet.specialty}</p>
-                    <p className="text-xs text-muted-foreground">CRMV: {vet.crmv}</p>
-                  </Card>
-                ))}
-              </div>
+              {isLoadingVeterinarians ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-vet-primary mb-2" />
+                  <p className="text-vet-neutral">Carregando equipe...</p>
+                </div>
+              ) : formattedVeterinarians.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-vet-neutral">Nenhum veterinário cadastrado</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {formattedVeterinarians.map((vet: any) => (
+                    <Card key={vet.id} className="p-6 text-center">
+                      <Avatar className="w-24 h-24 mx-auto mb-4">
+                        <AvatarImage src={vet.avatar} />
+                        <AvatarFallback className="text-2xl bg-vet-primary text-white">
+                          {vet.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <h3 className="font-bold text-lg mb-1">{vet.name}</h3>
+                      <p className="text-sm text-vet-primary mb-1">{vet.specialty}</p>
+                      <p className="text-xs text-muted-foreground">CRMV: {vet.crmv}</p>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </Card>
           </TabsContent>
 
-          {/* Reviews Tab */}
           <TabsContent value="reviews">
             <Card className="p-6">
               <div className="flex items-center justify-between mb-6">
@@ -404,55 +588,153 @@ const ClinicDetails = () => {
                         <Star
                           key={star}
                           className={`h-5 w-5 ${
-                            star <= Math.round(clinic.rating)
+                            star <= Math.round(clinic.rating || 0)
                               ? "fill-vet-accent text-vet-accent"
                               : "text-muted-foreground"
                           }`}
                         />
                       ))}
                     </div>
-                    <span className="text-2xl font-bold">{clinic.rating}</span>
-                    <span className="text-muted-foreground">({clinic.reviews} avaliações)</span>
+                    <span className="text-2xl font-bold">{clinic.rating ? parseFloat(clinic.rating).toFixed(1) : "0.0"}</span>
+                    <span className="text-muted-foreground">({clinic.total_reviews || 0} avaliações)</span>
                   </div>
                 </div>
               </div>
 
               <Separator className="my-6" />
 
-              <div className="space-y-6">
-                {clinic.reviews_list.map((review: any) => (
-                  <div key={review.id} className="space-y-3">
-                    <div className="flex items-start gap-4">
-                      <Avatar>
-                        <AvatarImage src={review.avatar} />
-                        <AvatarFallback className="bg-vet-primary text-white">
-                          {review.author.split(' ').map((n: string) => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold">{review.author}</h4>
-                          <span className="text-sm text-muted-foreground">{review.date}</span>
-                        </div>
-                        <div className="flex items-center gap-1 mb-2">
-                          {[1, 2, 3, 4, 5].map((star) => (
+              {user && completedAppointments.length > 0 && !existingReview && (
+                <Card className="p-6 mb-6 bg-vet-primary/5">
+                  <h3 className="text-xl font-bold mb-4">Deixe sua avaliação</h3>
+                  <div className="space-y-4">
+                    {completedAppointments.length > 1 && (
+                      <div className="space-y-2">
+                        <Label>Selecione a consulta que deseja avaliar *</Label>
+                        <Select value={selectedAppointmentForReview} onValueChange={setSelectedAppointmentForReview}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione uma consulta" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {completedAppointments.map((apt: any) => (
+                              <SelectItem key={apt.id} value={apt.id}>
+                                {apt.pet_name} - {format(new Date(apt.appointment_date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label>Nota *</Label>
+                      <div className="flex gap-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewRating(star)}
+                            className="focus:outline-none"
+                          >
                             <Star
-                              key={star}
-                              className={`h-4 w-4 ${
-                                star <= review.rating
-                                  ? "fill-vet-accent text-vet-accent"
-                                  : "text-muted-foreground"
+                              className={`h-8 w-8 transition-colors ${
+                                star <= reviewRating
+                                  ? "fill-vet-accent text-vet-accent cursor-pointer"
+                                  : "text-muted-foreground cursor-pointer hover:text-vet-accent/50"
                               }`}
                             />
-                          ))}
-                        </div>
-                        <p className="text-muted-foreground">{review.comment}</p>
+                          </button>
+                        ))}
                       </div>
+                      {reviewRating > 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          {reviewRating === 1 && "Péssimo"}
+                          {reviewRating === 2 && "Ruim"}
+                          {reviewRating === 3 && "Regular"}
+                          {reviewRating === 4 && "Bom"}
+                          {reviewRating === 5 && "Excelente"}
+                        </p>
+                      )}
                     </div>
-                    <Separator />
+
+                    <div className="space-y-2">
+                      <Label htmlFor="review-comment">Comentário *</Label>
+                      <Textarea
+                        id="review-comment"
+                        placeholder="Compartilhe sua experiência com esta clínica..."
+                        value={reviewComment}
+                        onChange={(e) => setReviewComment(e.target.value)}
+                        rows={4}
+                      />
+                    </div>
+
+                    <Button
+                      variant="vet"
+                      onClick={handleSubmitReview}
+                      disabled={createReviewMutation.isPending || !reviewRating || !reviewComment.trim()}
+                      className="w-full"
+                    >
+                      {createReviewMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Enviando...
+                        </>
+                      ) : (
+                        "Enviar Avaliação"
+                      )}
+                    </Button>
                   </div>
-                ))}
-              </div>
+                </Card>
+              )}
+
+              {isLoadingReviews ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-vet-primary mb-2" />
+                  <p className="text-vet-neutral">Carregando avaliações...</p>
+                </div>
+              ) : reviews.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-vet-neutral">Nenhuma avaliação ainda. Seja o primeiro a avaliar!</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {reviews.map((review: any) => (
+                    <div key={review.id} className="space-y-3">
+                      <div className="flex items-start gap-4">
+                        <Avatar>
+                          <AvatarImage src={review.avatar} />
+                          <AvatarFallback className="bg-vet-primary text-white">
+                            {review.first_name?.[0] || 'U'}{review.last_name?.[0] || ''}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold">
+                              {review.first_name} {review.last_name?.charAt(0) || ''}.
+                            </h4>
+                            <span className="text-sm text-muted-foreground">
+                              {format(new Date(review.created_at), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 mb-2">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`h-4 w-4 ${
+                                  star <= review.rating
+                                    ? "fill-vet-accent text-vet-accent"
+                                    : "text-muted-foreground"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <p className="text-muted-foreground">{review.comment}</p>
+                        </div>
+                      </div>
+                      <Separator />
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
           </TabsContent>
         </Tabs>

@@ -8,13 +8,72 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { parseISO, format, isToday } from "date-fns";
+import api from "@/services/api";
+
+const ClinicStatisticsCard = ({ clinicId }: { clinicId?: string }) => {
+  const { data: statistics, isLoading } = useQuery({
+    queryKey: ['clinicStatistics', clinicId],
+    queryFn: async () => {
+      if (!clinicId) return null;
+      return await api.getClinicStatistics(clinicId);
+    },
+    enabled: !!clinicId,
+  });
+
+  if (isLoading) {
+    return (
+      <Card className="p-6 bg-white/80 backdrop-blur-sm">
+        <h3 className="text-xl font-bold text-foreground mb-6">Estatísticas</h3>
+        <p className="text-vet-neutral text-center py-4">Carregando estatísticas...</p>
+      </Card>
+    );
+  }
+
+  const stats = statistics || {
+    totalAppointments: 0,
+    activeClients: 0,
+    averageRating: 0,
+    totalReviews: 0,
+    returnRate: 0
+  };
+
+  return (
+    <Card className="p-6 bg-white/80 backdrop-blur-sm">
+      <h3 className="text-xl font-bold text-foreground mb-6">Estatísticas</h3>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between p-3 bg-vet-primary/10 rounded-lg">
+          <span className="text-foreground">Total de Agendamentos</span>
+          <span className="font-bold text-vet-primary">{stats.totalAppointments.toLocaleString('pt-BR')}</span>
+        </div>
+
+        <div className="flex items-center justify-between p-3 bg-vet-success/10 rounded-lg">
+          <span className="text-foreground">Clientes Ativos</span>
+          <span className="font-bold text-vet-success">{stats.activeClients.toLocaleString('pt-BR')}</span>
+        </div>
+
+        <div className="flex items-center justify-between p-3 bg-vet-secondary/10 rounded-lg">
+          <span className="text-foreground">Avaliação Média</span>
+          <span className="font-bold text-vet-secondary">{stats.averageRating.toFixed(1)}/5.0</span>
+        </div>
+
+        <div className="flex items-center justify-between p-3 bg-vet-accent/10 rounded-lg">
+          <span className="text-foreground">Taxa de Retorno</span>
+          <span className="font-bold text-vet-accent">{stats.returnRate}%</span>
+        </div>
+      </div>
+    </Card>
+  );
+};
 import AddVeterinarianModal from "@/components/modals/AddVeterinarianModal";
 import NewAppointmentModal from "@/components/modals/NewAppointmentModal";
 import AppointmentDetailsModal from "@/components/modals/AppointmentDetailsModal";
 import EditAppointmentModal from "@/components/modals/EditAppointmentModal";
 import { VeterinarianScheduleModal } from "@/components/modals/VeterinarianScheduleModal";
 import { EditVeterinarianModal } from "@/components/modals/EditVeterinarianModal";
-import { 
+import {
   Calendar,
   Users,
   Clock,
@@ -38,7 +97,7 @@ import {
 
 const ClinicDashboard = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showAddVetModal, setShowAddVetModal] = useState(false);
   const [showNewAppointmentModal, setShowNewAppointmentModal] = useState(false);
@@ -46,39 +105,137 @@ const ClinicDashboard = () => {
   const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
   const [showVetScheduleModal, setShowVetScheduleModal] = useState(false);
   const [showEditVetModal, setShowEditVetModal] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState<typeof appointments[0] | undefined>();
-  const [selectedVeterinarian, setSelectedVeterinarian] = useState<typeof veterinarians[0] | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<any>(undefined);
+  const [selectedVeterinarian, setSelectedVeterinarian] = useState<any>(null);
 
-  // Mock data
-  const clinicData = {
-    name: "Clínica Veterinária PetCare",
-    rating: 4.8,
-    reviews: 342,
-    address: "Rua das Flores, 123 - Vila Madalena, São Paulo",
-    phone: "(11) 99999-9999",
-    email: "contato@petcare.com.br",
+  const { data: appointmentsData = [], isLoading: appointmentsLoading } = useQuery({
+    queryKey: ['clinicAppointments', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const response = await api.getAppointments({ clinicId: user.id });
+      console.log('[ClinicDashboard] Appointments response:', response);
+      return response || [];
+    },
+    enabled: !!user?.id,
+    refetchInterval: 30000,
+  });
+
+  const { data: veterinariansData = [], isLoading: veterinariansLoading } = useQuery({
+    queryKey: ['veterinarians', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return await api.getVeterinarians(user.id);
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: unreadCountData } = useQuery({
+    queryKey: ['unreadCount', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return { count: 0 };
+      const result = await api.getUnreadCount();
+      console.log('[ClinicDashboard] Unread count response:', result);
+      return result;
+    },
+    enabled: !!user?.id,
+    refetchInterval: 30000,
+  });
+
+  const unreadCount = unreadCountData?.count || 0;
+  console.log('[ClinicDashboard] Unread count:', unreadCount);
+
+  console.log('[ClinicDashboard] appointmentsData:', appointmentsData);
+  const formattedAppointments = appointmentsData.map((apt: any) => ({
+    ...apt,
+    time: apt.appointment_date ? format(parseISO(apt.appointment_date), 'HH:mm') : '',
+    date: apt.appointment_date ? format(parseISO(apt.appointment_date), 'dd/MM/yyyy') : '',
+    pet: apt.pet_name || apt.pet?.name || 'N/A',
+    owner: apt.user_name || (apt.user ? `${apt.user.first_name} ${apt.user.last_name}` : 'N/A'),
+    service: apt.service_name || apt.service?.name || 'N/A',
+  }));
+  console.log('[ClinicDashboard] formattedAppointments:', formattedAppointments);
+
+  const todayAppointments = formattedAppointments.filter((apt: any) => {
+    if (!apt.appointment_date) return false;
+    const aptDate = parseISO(apt.appointment_date);
+    return isToday(aptDate);
+  });
+
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const monthAppointments = formattedAppointments.filter((apt: any) => {
+    if (!apt.appointment_date) return false;
+    const aptDate = parseISO(apt.appointment_date);
+    return aptDate.getMonth() === currentMonth && aptDate.getFullYear() === currentYear;
+  });
+
+  const monthlyRevenue = monthAppointments.reduce((sum: number, apt: any) => {
+    const price = apt.service?.price || apt.price || 150;
+    return sum + price;
+  }, 0);
+
+  const uniqueUsersThisMonth = new Set(
+    monthAppointments
+      .filter((apt: any) => apt.user?.id)
+      .map((apt: any) => apt.user.id)
+  );
+
+  const confirmedAppointments = monthAppointments.filter(
+    (apt: any) => apt.status === 'confirmed' || apt.status === 'scheduled'
+  ).length;
+  const occupancyRate = monthAppointments.length > 0
+    ? Math.round((confirmedAppointments / monthAppointments.length) * 100)
+    : 0;
+
+  const clinicData = user?.clinic || {
+    name: user?.name || "Clínica",
+    rating: 0,
+    reviews: 0,
+    address: user?.address || "",
+    phone: user?.phone || "",
+    email: user?.email || "",
     avatar: "/placeholder.svg"
   };
 
   const metrics = [
-    { title: "Agendamentos Hoje", value: "23", icon: Calendar, color: "text-vet-primary" },
-    { title: "Receita do Mês", value: "R$ 45.2K", icon: DollarSign, color: "text-vet-success" },
-    { title: "Novos Clientes", value: "12", icon: Users, color: "text-vet-secondary" },
-    { title: "Taxa de Ocupação", value: "87%", icon: TrendingUp, color: "text-vet-accent" }
+    {
+      title: "Agendamentos Hoje",
+      value: todayAppointments.length.toString(),
+      icon: Calendar,
+      color: "text-vet-primary"
+    },
+    {
+      title: "Receita do Mês",
+      value: `R$ ${(monthlyRevenue / 1000).toFixed(1)}K`,
+      icon: DollarSign,
+      color: "text-vet-success"
+    },
+    {
+      title: "Novos Clientes",
+      value: uniqueUsersThisMonth.size.toString(),
+      icon: Users,
+      color: "text-vet-secondary"
+    },
+    {
+      title: "Taxa de Ocupação",
+      value: `${occupancyRate}%`,
+      icon: TrendingUp,
+      color: "text-vet-accent"
+    }
   ];
 
-  const appointments = [
-    { id: 1, time: "09:00", pet: "Rex", owner: "João Silva", service: "Consulta", status: "confirmed" },
-    { id: 2, time: "10:30", pet: "Mimi", owner: "Maria Santos", service: "Vacinação", status: "pending" },
-    { id: 3, time: "14:00", pet: "Bob", owner: "Carlos Lima", service: "Cirurgia", status: "confirmed" },
-    { id: 4, time: "15:30", pet: "Luna", owner: "Ana Costa", service: "Check-up", status: "confirmed" }
-  ];
+  const veterinarians = veterinariansData.length > 0 ? veterinariansData.map((vet: any) => ({
+    id: vet.id,
+    name: `${vet.first_name} ${vet.last_name}`,
+    specialty: vet.specialty,
+    crmv: vet.crmv,
+    status: "Ativo",
+    email: vet.email,
+    phone: vet.phone,
+  })) : [];
 
-  const veterinarians = [
-    { id: 1, name: "Dra. Maria Oliveira", specialty: "Clínica Geral", crmv: "CRMV-SP 12345", status: "Ativo", email: "maria@petcare.com", phone: "(11) 98888-8888" },
-    { id: 2, name: "Dr. João Santos", specialty: "Cirurgia", crmv: "CRMV-SP 67890", status: "Ativo", email: "joao@petcare.com", phone: "(11) 97777-7777" },
-    { id: 3, name: "Dra. Ana Costa", specialty: "Cardiologia", crmv: "CRMV-SP 11111", status: "Férias", email: "ana@petcare.com", phone: "(11) 96666-6666" }
-  ];
+  const formattedVeterinarians = veterinarians;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -93,7 +250,7 @@ const ClinicDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {}
       <header className="bg-white border-b border-border sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -103,33 +260,41 @@ const ClinicDashboard = () => {
                 <AvatarFallback className="bg-vet-primary text-white">PC</AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="text-xl font-bold text-foreground">{clinicData.name}</h1>
-                <div className="flex items-center gap-2 text-sm text-vet-neutral">
-                  <Star className="h-4 w-4 fill-vet-warning text-vet-warning" />
-                  {clinicData.rating} ({clinicData.reviews} avaliações)
-                </div>
+                <h1 className="text-xl font-bold text-foreground">{clinicData?.name || "Clínica"}</h1>
+                {clinicData?.rating && (
+                  <div className="flex items-center gap-2 text-sm text-vet-neutral">
+                    <Star className="h-4 w-4 fill-vet-warning text-vet-warning" />
+                    {clinicData.rating} {clinicData.reviews ? `(${clinicData.reviews} avaliações)` : ''}
+                  </div>
+                )}
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
-              <Button 
-                variant="vetOutline" 
+              <Button
+                variant="vetOutline"
                 size="sm"
                 onClick={() => navigate("/clinica/notificacoes")}
+                className="relative"
               >
                 <Bell className="h-4 w-4 mr-2" />
                 Notificações
+                {unreadCount > 0 && (
+                  <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 bg-vet-error text-white text-xs">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Badge>
+                )}
               </Button>
-              <Button 
-                variant="vet" 
+              <Button
+                variant="vet"
                 size="sm"
                 onClick={() => navigate("/clinica/configuracoes")}
               >
                 <Settings className="h-4 w-4 mr-2" />
                 Configurações
               </Button>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 size="sm"
                 onClick={logout}
               >
@@ -141,7 +306,7 @@ const ClinicDashboard = () => {
         </div>
       </header>
 
-      {/* Main Content */}
+      {}
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-5 mb-6">
@@ -152,9 +317,9 @@ const ClinicDashboard = () => {
             <TabsTrigger value="reports">Relatórios</TabsTrigger>
           </TabsList>
 
-          {/* Dashboard Tab */}
+          {}
           <TabsContent value="dashboard" className="space-y-6">
-            {/* Metrics Cards */}
+            {}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {metrics.map((metric, index) => {
                 const Icon = metric.icon;
@@ -174,7 +339,7 @@ const ClinicDashboard = () => {
               })}
             </div>
 
-            {/* Today's Appointments */}
+            {}
             <Card className="p-6 bg-white/80 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-foreground">Agendamentos de Hoje</h3>
@@ -183,44 +348,57 @@ const ClinicDashboard = () => {
                   Novo Agendamento
                 </Button>
               </div>
-              
-              <div className="space-y-4">
-                {appointments.map((appointment) => (
-                  <div key={appointment.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className="text-center">
-                        <Clock className="h-4 w-4 text-vet-neutral mx-auto mb-1" />
-                        <p className="text-sm font-medium text-foreground">{appointment.time}</p>
+
+              {appointmentsLoading ? (
+                <p className="text-vet-neutral text-center py-4">Carregando agendamentos...</p>
+              ) : formattedAppointments.filter((apt: any) => {
+                if (!apt.appointment_date) return false;
+                const aptDate = parseISO(apt.appointment_date);
+                return isToday(aptDate);
+              }).length === 0 ? (
+                <p className="text-vet-neutral text-center py-4">Nenhum agendamento hoje</p>
+              ) : (
+                <div className="space-y-4">
+                  {formattedAppointments.filter((apt: any) => {
+                    if (!apt.appointment_date) return false;
+                    const aptDate = parseISO(apt.appointment_date);
+                    return isToday(aptDate);
+                  }).map((appointment: any) => (
+                    <div key={appointment.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                      <div className="flex items-center gap-4">
+                        <div className="text-center">
+                          <Clock className="h-4 w-4 text-vet-neutral mx-auto mb-1" />
+                          <p className="text-sm font-medium text-foreground">{appointment.time}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground">{appointment.pet}</p>
+                          <p className="text-sm text-vet-neutral">Serviço: {appointment.service}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-foreground">{appointment.pet}</p>
-                        <p className="text-sm text-vet-neutral">Dono: {appointment.owner}</p>
-                        <p className="text-sm text-vet-neutral">{appointment.service}</p>
+
+                      <div className="flex items-center gap-3">
+                        <Badge className={`${getStatusColor(appointment.status)}`}>
+                          {appointment.status === 'confirmed' ? 'Confirmado' : appointment.status === 'pending' ? 'Pendente' : appointment.status}
+                        </Badge>
+                        <Button
+                          variant="vetOutline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedAppointment(appointment);
+                            setShowEditAppointmentModal(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <Badge className={`${getStatusColor(appointment.status)}`}>
-                        {appointment.status === 'confirmed' ? 'Confirmado' : 'Pendente'}
-                      </Badge>
-                      <Button 
-                        variant="vetOutline" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedAppointment(appointment);
-                          setShowEditAppointmentModal(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </Card>
           </TabsContent>
 
-          {/* Appointments Tab */}
+          {}
           <TabsContent value="appointments" className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-foreground">Gestão de Agendamentos</h2>
@@ -241,55 +419,64 @@ const ClinicDashboard = () => {
             </div>
 
             <Card className="p-6 bg-white/80 backdrop-blur-sm">
-              <div className="space-y-4">
-                {appointments.map((appointment) => (
-                  <div key={appointment.id} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-vet-primary/5 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="text-center">
-                        <Clock className="h-5 w-5 text-vet-neutral mx-auto mb-1" />
-                        <p className="font-medium text-foreground">{appointment.time}</p>
+              {appointmentsLoading ? (
+                <p className="text-vet-neutral text-center py-4">Carregando agendamentos...</p>
+              ) : formattedAppointments.length === 0 ? (
+                <p className="text-vet-neutral text-center py-4">Nenhum agendamento encontrado</p>
+              ) : (
+                <div className="space-y-4">
+                  {formattedAppointments.map((appointment: any) => (
+                    <div key={appointment.id} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-vet-primary/5 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className="text-center">
+                          <Clock className="h-5 w-5 text-vet-neutral mx-auto mb-1" />
+                          <p className="font-medium text-foreground">{appointment.time}</p>
+                          <p className="text-xs text-vet-neutral">{appointment.date}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground text-lg">{appointment.pet}</p>
+                          <p className="text-vet-neutral">Serviço: {appointment.service}</p>
+                          {appointment.veterinarian_name && (
+                            <p className="text-vet-neutral">Veterinário: {appointment.veterinarian_name}</p>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-foreground text-lg">{appointment.pet}</p>
-                        <p className="text-vet-neutral">Proprietário: {appointment.owner}</p>
-                        <p className="text-vet-neutral">Serviço: {appointment.service}</p>
+
+                      <div className="flex items-center gap-3">
+                        <Badge className={`${getStatusColor(appointment.status)}`}>
+                          {appointment.status === 'confirmed' ? 'Confirmado' : appointment.status === 'pending' ? 'Pendente' : appointment.status}
+                        </Badge>
+                        <Button
+                          variant="vetOutline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedAppointment(appointment);
+                            setShowAppointmentDetailsModal(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Detalhes
+                        </Button>
+                        <Button
+                          variant="vetOutline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedAppointment(appointment);
+                            setShowEditAppointmentModal(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Editar
+                        </Button>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <Badge className={`${getStatusColor(appointment.status)}`}>
-                        {appointment.status === 'confirmed' ? 'Confirmado' : 'Pendente'}
-                      </Badge>
-                      <Button 
-                        variant="vetOutline" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedAppointment(appointment);
-                          setShowAppointmentDetailsModal(true);
-                        }}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        Detalhes
-                      </Button>
-                      <Button 
-                        variant="vetOutline" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedAppointment(appointment);
-                          setShowEditAppointmentModal(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Editar
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </Card>
           </TabsContent>
 
-          {/* Veterinarians Tab */}
+          {}
           <TabsContent value="veterinarians" className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-foreground">Equipe Veterinária</h2>
@@ -300,7 +487,18 @@ const ClinicDashboard = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {veterinarians.map((vet) => (
+              {veterinariansLoading ? (
+                <p className="text-vet-neutral text-center py-4 col-span-full">Carregando veterinários...</p>
+              ) : formattedVeterinarians.length === 0 ? (
+                <Card className="p-6 col-span-full text-center">
+                  <p className="text-vet-neutral mb-4">Nenhum veterinário cadastrado</p>
+                  <Button variant="vet" onClick={() => setShowAddVetModal(true)}>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Adicionar Primeiro Veterinário
+                  </Button>
+                </Card>
+              ) : (
+                formattedVeterinarians.map((vet: any) => (
                 <Card key={vet.id} className="p-6 bg-white/80 backdrop-blur-sm">
                   <div className="text-center">
                     <Avatar className="h-20 w-20 mx-auto mb-4">
@@ -309,19 +507,19 @@ const ClinicDashboard = () => {
                         {vet.name.split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
-                    
+
                     <h3 className="font-bold text-foreground text-lg">{vet.name}</h3>
                     <p className="text-vet-neutral mb-2">{vet.specialty}</p>
                     <p className="text-sm text-vet-neutral mb-4">{vet.crmv}</p>
-                    
+
                     <Badge className={`${getStatusColor(vet.status)} mb-4`}>
                       {vet.status}
                     </Badge>
-                    
+
                     <div className="flex gap-2">
-                      <Button 
-                        variant="vetOutline" 
-                        size="sm" 
+                      <Button
+                        variant="vetOutline"
+                        size="sm"
                         className="flex-1"
                         onClick={() => {
                           setSelectedVeterinarian(vet);
@@ -331,9 +529,9 @@ const ClinicDashboard = () => {
                         <Edit className="h-4 w-4 mr-2" />
                         Editar
                       </Button>
-                      <Button 
-                        variant="vet" 
-                        size="sm" 
+                      <Button
+                        variant="vet"
+                        size="sm"
                         className="flex-1"
                         onClick={() => {
                           setSelectedVeterinarian(vet);
@@ -346,75 +544,52 @@ const ClinicDashboard = () => {
                     </div>
                   </div>
                 </Card>
-              ))}
+                ))
+              )}
             </div>
           </TabsContent>
 
-          {/* Profile Tab */}
+          {}
           <TabsContent value="profile" className="space-y-6">
             <h2 className="text-2xl font-bold text-foreground">Perfil da Clínica</h2>
-            
+
             <div className="grid lg:grid-cols-2 gap-8">
               <Card className="p-6 bg-white/80 backdrop-blur-sm">
                 <h3 className="text-xl font-bold text-foreground mb-6">Informações Básicas</h3>
-                
+
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="clinicName">Nome da Clínica</Label>
-                    <Input defaultValue={clinicData.name} />
+                    <Input defaultValue={clinicData?.name || ""} />
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="address">Endereço</Label>
-                    <Input defaultValue={clinicData.address} />
+                    <Input defaultValue={clinicData?.address || ""} />
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="phone">Telefone</Label>
-                      <Input defaultValue={clinicData.phone} />
+                      <Input defaultValue={clinicData?.phone || ""} />
                     </div>
                     <div>
                       <Label htmlFor="email">Email</Label>
-                      <Input defaultValue={clinicData.email} />
+                      <Input defaultValue={clinicData?.email || ""} />
                     </div>
                   </div>
-                  
+
                   <Button variant="vet" className="w-full">
                     Salvar Alterações
                   </Button>
                 </div>
               </Card>
 
-              <Card className="p-6 bg-white/80 backdrop-blur-sm">
-                <h3 className="text-xl font-bold text-foreground mb-6">Estatísticas</h3>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-vet-primary/10 rounded-lg">
-                    <span className="text-foreground">Total de Agendamentos</span>
-                    <span className="font-bold text-vet-primary">1,234</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 bg-vet-success/10 rounded-lg">
-                    <span className="text-foreground">Clientes Ativos</span>
-                    <span className="font-bold text-vet-success">456</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 bg-vet-secondary/10 rounded-lg">
-                    <span className="text-foreground">Avaliação Média</span>
-                    <span className="font-bold text-vet-secondary">{clinicData.rating}/5.0</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 bg-vet-accent/10 rounded-lg">
-                    <span className="text-foreground">Taxa de Retorno</span>
-                    <span className="font-bold text-vet-accent">87%</span>
-                  </div>
-                </div>
-              </Card>
+              <ClinicStatisticsCard clinicId={user?.id} />
             </div>
           </TabsContent>
 
-          {/* Reports Tab */}
+          {}
           <TabsContent value="reports" className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-foreground">Relatórios</h2>
@@ -425,7 +600,7 @@ const ClinicDashboard = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card 
+              <Card
                 className="p-6 bg-white/80 backdrop-blur-sm hover:shadow-lg transition-shadow cursor-pointer"
                 onClick={() => navigate("/relatorios/mensal")}
               >
@@ -441,7 +616,7 @@ const ClinicDashboard = () => {
                 </div>
               </Card>
 
-              <Card 
+              <Card
                 className="p-6 bg-white/80 backdrop-blur-sm hover:shadow-lg transition-shadow cursor-pointer"
                 onClick={() => navigate("/relatorios/clientes")}
               >
@@ -457,7 +632,7 @@ const ClinicDashboard = () => {
                 </div>
               </Card>
 
-              <Card 
+              <Card
                 className="p-6 bg-white/80 backdrop-blur-sm hover:shadow-lg transition-shadow cursor-pointer"
                 onClick={() => navigate("/relatorios/financeiro")}
               >
@@ -477,32 +652,39 @@ const ClinicDashboard = () => {
         </Tabs>
       </div>
 
-      {/* Modals */}
-      <AddVeterinarianModal 
-        open={showAddVetModal} 
-        onOpenChange={setShowAddVetModal} 
+      {}
+      <AddVeterinarianModal
+        open={showAddVetModal}
+        onOpenChange={setShowAddVetModal}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['veterinarians', user?.id] });
+        }}
       />
-      <NewAppointmentModal 
-        open={showNewAppointmentModal} 
-        onOpenChange={setShowNewAppointmentModal} 
+      <NewAppointmentModal
+        open={showNewAppointmentModal}
+        onOpenChange={setShowNewAppointmentModal}
       />
-      <AppointmentDetailsModal 
-        open={showAppointmentDetailsModal} 
+      <AppointmentDetailsModal
+        open={showAppointmentDetailsModal}
         onOpenChange={setShowAppointmentDetailsModal}
         appointment={selectedAppointment}
+        onEdit={() => {
+          setShowAppointmentDetailsModal(false);
+          setShowEditAppointmentModal(true);
+        }}
       />
-      <EditAppointmentModal 
-        open={showEditAppointmentModal} 
+      <EditAppointmentModal
+        open={showEditAppointmentModal}
         onOpenChange={setShowEditAppointmentModal}
         appointment={selectedAppointment}
       />
-      <VeterinarianScheduleModal 
-        open={showVetScheduleModal} 
+      <VeterinarianScheduleModal
+        open={showVetScheduleModal}
         onOpenChange={setShowVetScheduleModal}
         veterinarian={selectedVeterinarian}
       />
-      <EditVeterinarianModal 
-        open={showEditVetModal} 
+      <EditVeterinarianModal
+        open={showEditVetModal}
         onOpenChange={setShowEditVetModal}
         veterinarian={selectedVeterinarian}
       />
