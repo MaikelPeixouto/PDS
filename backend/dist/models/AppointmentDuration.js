@@ -12,23 +12,30 @@ class AppointmentDurationModel {
         return result.rows;
     }
     static async upsert(clinicId, durations) {
+        // Delete existing record
         await database_1.default.query('DELETE FROM clinic_appointment_durations WHERE clinic_id = $1', [clinicId]);
-        const values = [];
-        const placeholders = [];
-        let paramCount = 1;
-        for (const duration of durations) {
-            placeholders.push(`($${paramCount}, $${paramCount + 1}, $${paramCount + 2})`);
-            values.push(clinicId, duration.appointment_type, duration.duration_minutes);
-            paramCount += 3;
-        }
-        if (placeholders.length === 0) {
+
+        // durations should be an object like: { standard: 30, followup: 15, emergency: 60 }
+        // Or if it's an array with a single object, extract it
+        const durationsObj = Array.isArray(durations) ? durations[0] : durations;
+
+        if (!durationsObj) {
             return [];
         }
+
         const query = `
-            INSERT INTO clinic_appointment_durations (clinic_id, appointment_type, duration_minutes)
-            VALUES ${placeholders.join(', ')}
+            INSERT INTO clinic_appointment_durations (clinic_id, standard, followup, emergency)
+            VALUES ($1, $2, $3, $4)
             RETURNING *
         `;
+
+        const values = [
+            clinicId,
+            durationsObj.standard || 30,
+            durationsObj.followup || 15,
+            durationsObj.emergency || 60
+        ];
+
         const result = await database_1.default.query(query, values);
         return result.rows;
     }

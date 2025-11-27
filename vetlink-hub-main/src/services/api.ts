@@ -205,7 +205,7 @@ class ApiService {
     }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password, userType }),
-    });
+    }, false);
 
     if (response.data?.tokens) {
       localStorage.setItem('accessToken', response.data.tokens.accessToken);
@@ -601,6 +601,22 @@ class ApiService {
     return response.data || [];
   }
 
+  async createClinicAppointment(data: {
+    clientName: string;
+    clientPhone: string;
+    petName: string;
+    petType: string;
+    serviceId: string;
+    veterinarianId: string;
+    date: Date;
+    notes?: string;
+  }) {
+    return this.request<any>('/clinics/me/appointments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async getBillingInfo() {
     const response = await this.request<{
       pix_key?: string;
@@ -702,21 +718,6 @@ class ApiService {
     return response.data;
   }
 
-  async deleteTeamMember(memberId: string) {
-    const response = await this.request<void>(`/clinics/me/team/${memberId}`, {
-      method: 'DELETE',
-    });
-    return response;
-  }
-
-  async updateTeamMemberPermissions(memberId: string, permissions: Array<any>) {
-    const response = await this.request<any>(`/clinics/me/team/${memberId}/permissions`, {
-      method: 'PUT',
-      body: JSON.stringify({ permissions }),
-    });
-    return response.data;
-  }
-
   async getServices() {
     const response = await this.request<any>('/services');
     if ((response as any).services) {
@@ -728,6 +729,44 @@ class ApiService {
   async getService(id: number) {
     const response = await this.request<{ service: any }>(`/services/${id}`);
     return response.data?.service;
+  }
+
+  // Clinic Service Management (Per-Clinic Services)
+  async getClinicServices() {
+    const response = await this.request<{ services: any[] }>('/clinics/me/services');
+    return (response as any).services || response.data?.services || [];
+  }
+
+  async createClinicService(data: {
+    name: string;
+    price: number;
+    duration_minutes?: number;
+    description?: string;
+  }) {
+    const response = await this.request<{ service: any }>('/clinics/me/services', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return (response as any).service || response.data?.service;
+  }
+
+  async updateClinicService(id: string, data: Partial<{
+    name: string;
+    price: number;
+    duration_minutes: number;
+    description: string;
+  }>) {
+    const response = await this.request<{ service: any }>(`/clinics/me/services/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return (response as any).service || response.data?.service;
+  }
+
+  async deleteClinicService(id: string) {
+    await this.request<void>(`/clinics/me/services/${id}`, {
+      method: 'DELETE',
+    });
   }
 
   async getVeterinarians(clinicId?: string | number) {

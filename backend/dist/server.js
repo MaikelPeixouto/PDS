@@ -12,6 +12,8 @@ const vaccineRoutes_1 = __importDefault(require("./routes/vaccineRoutes"));
 const appointmentRoutes_1 = __importDefault(require("./routes/appointmentRoutes"));
 const serviceRoutes_1 = __importDefault(require("./routes/serviceRoutes"));
 const clinicRoutes_1 = __importDefault(require("./routes/clinicRoutes"));
+const clinicServiceRoutes = require('./routes/clinicServiceRoutes');
+const clinicAppointmentRoutes = require('./routes/clinicAppointmentRoutes');
 const veterinarianRoutes_1 = __importDefault(require("./routes/veterinarianRoutes"));
 const notificationRoutes_1 = __importDefault(require("./routes/notificationRoutes"));
 const reportRoutes_1 = __importDefault(require("./routes/reportRoutes"));
@@ -43,6 +45,8 @@ app.use('/api/vaccines', vaccineRoutes_1.default);
 app.use('/api/appointments', appointmentRoutes_1.default);
 app.use('/api/services', serviceRoutes_1.default);
 app.use('/api/clinics', clinicRoutes_1.default);
+app.use('/api/clinics', clinicServiceRoutes.default || clinicServiceRoutes);
+app.use('/api/clinics/me/appointments', clinicAppointmentRoutes);
 app.use('/api/veterinarians', veterinarianRoutes_1.default);
 app.use('/api/clinics', notificationRoutes_1.default);
 app.use('/api/clinics', reportRoutes_1.default);
@@ -55,12 +59,39 @@ app.use('*', (req, res) => {
 });
 app.use((err, req, res, next) => {
     console.error('Error:', err);
+    const fs = require('fs');
+    try {
+        fs.writeFileSync('error.log', `[${new Date().toISOString()}] Global Error: ${err.message}\nStack: ${err.stack}\n`);
+    } catch (e) {
+        console.error('Failed to write to error.log', e);
+    }
     res.status(err.status || 500).json({
         success: false,
         message: err.message || 'Erro interno do servidor',
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
     });
 });
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    const fs = require('fs');
+    try {
+        fs.writeFileSync('error.log', `[${new Date().toISOString()}] Uncaught Exception: ${error.message}\nStack: ${error.stack}\n`);
+    } catch (e) {
+        console.error('Failed to write to error.log', e);
+    }
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    const fs = require('fs');
+    try {
+        fs.writeFileSync('error.log', `[${new Date().toISOString()}] Unhandled Rejection: ${reason}\n`);
+    } catch (e) {
+        console.error('Failed to write to error.log', e);
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`🚀 VetFinder API server running on port ${PORT}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);

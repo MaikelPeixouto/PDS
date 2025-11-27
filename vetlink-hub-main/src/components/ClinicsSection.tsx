@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import ClinicCard from "./ClinicCard";
 import clinic1 from "@/assets/clinic-1.jpg";
 import api from "@/services/api";
+import { calculateDistance, getUserLocation } from "@/services/googleMapsService";
 
 interface ClinicsSectionProps {
   searchResults?: any[] | null;
@@ -13,6 +14,14 @@ interface ClinicsSectionProps {
 const ClinicsSection = ({ searchResults, isSearchMode = false, onViewAll }: ClinicsSectionProps) => {
   const [allClinics, setAllClinics] = useState<any[]>([]);
   const [isLoadingAll, setIsLoadingAll] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  // Try to get user location on mount for distance calculation
+  useEffect(() => {
+    getUserLocation()
+      .then(location => setUserLocation(location))
+      .catch(() => setUserLocation(null)); // Silently fail, won't show distance
+  }, []);
 
   const { data: defaultClinics = [], isLoading: isLoadingDefault } = useQuery({
     queryKey: ['clinics', 'default'],
@@ -44,12 +53,26 @@ const ClinicsSection = ({ searchResults, isSearchMode = false, onViewAll }: Clin
   };
 
   const formatClinicForCard = (clinic: any) => {
+    // Calculate distance if user location is available and clinic has coordinates
+    let distance: number | string = "N/A";
+    if (userLocation && clinic.latitude && clinic.longitude) {
+      distance = calculateDistance(
+        userLocation.latitude,
+        userLocation.longitude,
+        clinic.latitude,
+        clinic.longitude
+      );
+    } else if (clinic.distance !== undefined) {
+      // Use already calculated distance (from search results)
+      distance = clinic.distance;
+    }
+
     return {
       id: clinic.id || clinic.place_id || `clinic-${Math.random()}`,
       name: clinic.name,
       rating: clinic.rating || 0,
       reviews: clinic.total_reviews || clinic.user_ratings_total || 0,
-      distance: clinic.distance || "N/A",
+      distance: distance,
       address: clinic.address || clinic.vicinity || "Endereço não disponível",
       phone: clinic.phone || "Telefone não disponível",
       openUntil: clinic.hours || "Horário não disponível",

@@ -69,15 +69,18 @@ exports.findAppointmentsByUserId = findAppointmentsByUserId;
 const findAppointmentsByClinicId = async (clinicId) => {
     const result = await database_1.default.query(`SELECT
     a.*,
-    p.name as pet_name,
+    COALESCE(p.name, a.pet_name) as pet_name,
     p.species as pet_species,
+    COALESCE(u.first_name || ' ' || u.last_name, a.client_name) as user_name,
+    a.client_phone,
     c.name as clinic_name,
     CONCAT(v.first_name, ' ', v.last_name) as veterinarian_name,
     s.name as service_name,
     s.price as service_price,
     s.duration_minutes as service_duration
     FROM vet_appointments a
-    JOIN vet_pets p ON a.pet_id = p.id
+    LEFT JOIN vet_pets p ON a.pet_id = p.id
+    LEFT JOIN users u ON a.user_id = u.id
     JOIN clinics c ON a.clinic_id = c.id
     LEFT JOIN vet_veterinarians v ON a.veterinarian_id = v.id
     JOIN vet_services s ON a.service_id = s.id

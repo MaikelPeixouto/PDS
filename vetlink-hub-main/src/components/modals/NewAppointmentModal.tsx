@@ -11,7 +11,8 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/services/api";
 
@@ -22,6 +23,8 @@ interface NewAppointmentModalProps {
 
 const NewAppointmentModal = ({ open, onOpenChange }: NewAppointmentModalProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [date, setDate] = useState<Date>();
   const [formData, setFormData] = useState({
     clientName: "",
@@ -47,10 +50,80 @@ const NewAppointmentModal = ({ open, onOpenChange }: NewAppointmentModalProps) =
     ? veterinariansData.filter((vet: any) => vet && vet.id && String(vet.id).trim() !== '')
     : [];
 
+  const { data: servicesData = [], isLoading: servicesLoading } = useQuery({
+    queryKey: ['clinicServices', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const services = await api.getClinicServices();
+      return services || [];
+    },
+    enabled: !!user?.id && open,
+  });
+
+  const services = Array.isArray(servicesData) ? servicesData : [];
+
+  const createAppointmentMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await api.createClinicAppointment(data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Agendamento criado",
+        description: "O agendamento foi criado com sucesso.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['clinicStats'] }); // Refresh dashboard stats
+      onOpenChange(false);
+      // Reset form
+      setFormData({
+        clientName: "",
+        clientPhone: "",
+        petName: "",
+        petType: "",
+        service: "",
+        veterinarian: "",
+        time: "",
+        notes: ""
+      });
+      setDate(undefined);
+    },
+    onError: (error: any) => {
+      console.error(error);
+      toast({
+        title: "Erro ao criar agendamento",
+        description: error.message || "Ocorreu um erro ao criar o agendamento.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Novo agendamento:", { ...formData, date });
-    onOpenChange(false);
+
+    if (!date || !formData.time) {
+      toast({
+        title: "Data e horário obrigatórios",
+        description: "Selecione uma data e horário para o agendamento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Combine date and time
+    const [hours, minutes] = formData.time.split(':');
+    const appointmentDate = new Date(date);
+    appointmentDate.setHours(parseInt(hours), parseInt(minutes));
+
+    createAppointmentMutation.mutate({
+      clientName: formData.clientName,
+      clientPhone: formData.clientPhone,
+      petName: formData.petName,
+      petType: formData.petType,
+      serviceId: formData.service,
+      appointmentDate: appointmentDate.toISOString(),
+      notes: formData.notes,
+      veterinarianId: formData.veterinarian || undefined,
+    });
   };
 
   return (
@@ -170,11 +243,17 @@ const NewAppointmentModal = ({ open, onOpenChange }: NewAppointmentModalProps) =
                   <SelectValue placeholder="Selecione o serviço" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="consulta">Consulta</SelectItem>
-                  <SelectItem value="vacinacao">Vacinação</SelectItem>
-                  <SelectItem value="cirurgia">Cirurgia</SelectItem>
-                  <SelectItem value="checkup">Check-up</SelectItem>
-                  <SelectItem value="emergencia">Emergência</SelectItem>
+                  {servicesLoading ? (
+                    <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                  ) : services.length === 0 ? (
+                    <SelectItem value="no-service" disabled>Nenhum serviço cadastrado</SelectItem>
+                  ) : (
+                    services.map((service: any) => (
+                      <SelectItem key={service.id} value={service.id}>
+                        {service.name} - R$ {Number(service.price).toFixed(2)}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

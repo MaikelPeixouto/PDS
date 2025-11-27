@@ -137,6 +137,28 @@ const updateClinicProfileController = async (req, res) => {
     }
     catch (error) {
         console.error('Error updating clinic profile:', error);
+        const fs = require('fs');
+        try {
+            fs.writeFileSync('error.log', `[${new Date().toISOString()}] Error: ${error.message}\nStack: ${error.stack}\n`);
+        } catch (e) {
+            console.error('Failed to write to error.log', e);
+        }
+
+        if (error.code === '23505') {
+            if (error.constraint === 'clinics_cnpj_key') {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Já existe uma clínica cadastrada com este CNPJ'
+                });
+            }
+            if (error.constraint === 'clinics_email_key') {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Já existe uma clínica cadastrada com este e-mail'
+                });
+            }
+        }
+
         res.status(500).json({
             success: false,
             message: 'Erro interno do servidor'
@@ -325,41 +347,41 @@ const searchExternalClinicsController = async (req, res) => {
             const placesData = await placesResponse.json();
             if (placesData.status === 'OK' && placesData.results) {
                 for (const place of placesData.results) {
-                const existingClinic = await database_1.default.query(
-                    'SELECT id FROM clinics WHERE address ILIKE $1 OR name ILIKE $2 LIMIT 1',
-                    [`%${place.vicinity || ''}%`, `%${place.name}%`]
-                );
-                if (existingClinic.rows.length === 0) {
-                    const R = 6371;
-                    const dLat = (place.geometry.location.lat - latitude) * Math.PI / 180;
-                    const dLon = (place.geometry.location.lng - longitude) * Math.PI / 180;
-                    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                        Math.cos(latitude * Math.PI / 180) * Math.cos(place.geometry.location.lat * Math.PI / 180) *
-                        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                    const calculatedDistance = R * c;
-                    allResults.push({
-                        id: place.place_id,
-                        name: place.name,
-                        address: place.vicinity || 'Endereço não disponível',
-                        rating: place.rating || 0,
-                        total_reviews: place.user_ratings_total || 0,
-                        latitude: place.geometry.location.lat,
-                        longitude: place.geometry.location.lng,
-                        isRegistered: false,
-                        distance: `${calculatedDistance.toFixed(1)} km`,
-                        photo_reference: place.photos && place.photos[0] ? place.photos[0].photo_reference : null
-                    });
-                }
+                    const existingClinic = await database_1.default.query(
+                        'SELECT id FROM clinics WHERE address ILIKE $1 OR name ILIKE $2 LIMIT 1',
+                        [`%${place.vicinity || ''}%`, `%${place.name}%`]
+                    );
+                    if (existingClinic.rows.length === 0) {
+                        const R = 6371;
+                        const dLat = (place.geometry.location.lat - latitude) * Math.PI / 180;
+                        const dLon = (place.geometry.location.lng - longitude) * Math.PI / 180;
+                        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                            Math.cos(latitude * Math.PI / 180) * Math.cos(place.geometry.location.lat * Math.PI / 180) *
+                            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                        const calculatedDistance = R * c;
+                        allResults.push({
+                            id: place.place_id,
+                            name: place.name,
+                            address: place.vicinity || 'Endereço não disponível',
+                            rating: place.rating || 0,
+                            total_reviews: place.user_ratings_total || 0,
+                            latitude: place.geometry.location.lat,
+                            longitude: place.geometry.location.lng,
+                            isRegistered: false,
+                            distance: `${calculatedDistance.toFixed(1)} km`,
+                            photo_reference: place.photos && place.photos[0] ? place.photos[0].photo_reference : null
+                        });
+                    }
                 }
             }
         }
         const limitedResults = allResults
             .sort((a, b) => {
-            const distA = parseFloat(a.distance.replace(' km', '').replace('N/A', '999999'));
-            const distB = parseFloat(b.distance.replace(' km', '').replace('N/A', '999999'));
-            return distA - distB;
-        })
+                const distA = parseFloat(a.distance.replace(' km', '').replace('N/A', '999999'));
+                const distB = parseFloat(b.distance.replace(' km', '').replace('N/A', '999999'));
+                return distA - distB;
+            })
             .slice(0, limit);
         res.status(200).json({
             success: true,

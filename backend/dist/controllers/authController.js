@@ -17,51 +17,48 @@ const registerUser = async (req, res) => {
             });
         }
         const { email, password, firstName, lastName, phone, cpf } = req.body;
-        if (await User_1.UserModel.emailExists(email)) {
+        const trimmedEmail = email.trim();
+        if (await User_1.UserModel.emailExists(trimmedEmail)) {
             return res.status(409).json({
                 success: false,
                 message: 'Email já está em uso'
             });
         }
-        if (cpf && await User_1.UserModel.cpfExists(cpf)) {
-            return res.status(409).json({
-                success: false,
-                message: 'CPF já está em uso'
-            });
-        }
-        const passwordHash = await (0, tokenUtils_1.hashPassword)(password);
-        const userData = {
-            email,
-            password_hash: passwordHash,
+        const hashedPassword = await tokenUtils_1.TokenUtils.hashPassword(password);
+        const user = await User_1.UserModel.create({
+            email: trimmedEmail,
+            password: hashedPassword,
             first_name: firstName,
             last_name: lastName,
-            phone: phone || undefined,
-            cpf: cpf || undefined,
-        };
-        const user = await User_1.UserModel.create(userData);
-        const { accessToken, refreshToken, tokenId } = (0, tokenUtils_1.generateTokenPair)(user.id, user.email, 'user');
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 7);
-        await RefreshToken_1.RefreshTokenModel.create({
-            token: refreshToken,
-            user_id: user.id,
-            expires_at: expiresAt,
+            phone,
+            cpf
         });
-        const { password_hash, ...userResponse } = user;
+        const tokens = tokenUtils_1.TokenUtils.generateTokens({
+            id: user.id,
+            email: user.email,
+            type: 'user'
+        });
+        await RefreshToken_1.RefreshTokenModel.create({
+            token: tokens.refreshToken,
+            user_id: user.id,
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+        });
         res.status(201).json({
             success: true,
-            message: 'Usuário criado com sucesso',
+            message: 'Usuário registrado com sucesso',
             data: {
-                user: userResponse,
-                tokens: {
-                    accessToken,
-                    refreshToken,
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    firstName: user.first_name,
+                    lastName: user.last_name
                 },
-            },
+                tokens
+            }
         });
     }
     catch (error) {
-        console.error('Register user error:', error);
+        console.error('Erro ao registrar usuário:', error);
         res.status(500).json({
             success: false,
             message: 'Erro interno do servidor'
@@ -80,7 +77,8 @@ const registerClinic = async (req, res) => {
             });
         }
         const { email, password, name, cnpj, phone, address, description, hours, specialties } = req.body;
-        if (await Clinic_1.ClinicModel.emailExists(email)) {
+        const trimmedEmail = email.trim();
+        if (await Clinic_1.ClinicModel.emailExists(trimmedEmail)) {
             return res.status(409).json({
                 success: false,
                 message: 'Email já está em uso'
@@ -94,7 +92,7 @@ const registerClinic = async (req, res) => {
         }
         const passwordHash = await (0, tokenUtils_1.hashPassword)(password);
         const clinicData = {
-            email,
+            email: trimmedEmail,
             password_hash: passwordHash,
             name,
             cnpj,
@@ -146,13 +144,14 @@ const login = async (req, res) => {
             });
         }
         const { email, password, userType } = req.body;
+        const trimmedEmail = email.trim();
         let user = null;
         let entityType = userType;
         if (userType === 'user') {
-            user = await User_1.UserModel.findByEmail(email);
+            user = await User_1.UserModel.findByEmail(trimmedEmail);
         }
         else if (userType === 'clinic') {
-            user = await Clinic_1.ClinicModel.findByEmail(email);
+            user = await Clinic_1.ClinicModel.findByEmail(trimmedEmail);
         }
         else {
             return res.status(400).json({

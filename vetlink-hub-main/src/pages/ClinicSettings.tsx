@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/services/api";
 import { RolePermissionsModal } from "@/components/modals/RolePermissionsModal";
+import ServiceManagement from "@/components/clinic/ServiceManagement";
 import {
     ArrowLeft,
     Building2,
@@ -54,7 +55,7 @@ const ClinicSettings = () => {
         queryFn: async () => {
             if (!user?.id) return null;
             const response = await api.getClinic(user.id);
-            return response.data;
+            return response;
         },
         enabled: !!user?.id,
     });
@@ -683,7 +684,7 @@ const ClinicSettings = () => {
         queryFn: async () => {
             if (!user?.id) return null;
             const response = await api.getClinic(user.id);
-            return response.data;
+            return response;
         },
         enabled: !!user?.id && activeTab === "security",
     });
@@ -751,12 +752,10 @@ const ClinicSettings = () => {
                 queryKey: ["clinicProfile", user?.id],
             });
             toast({
-                title: `2FA ${
-                    data.two_factor_enabled ? "ativado" : "desativado"
-                }`,
-                description: `Autenticação em dois fatores foi ${
-                    data.two_factor_enabled ? "ativada" : "desativada"
-                } com sucesso.`,
+                title: `2FA ${data.two_factor_enabled ? "ativado" : "desativado"
+                    }`,
+                description: `Autenticação em dois fatores foi ${data.two_factor_enabled ? "ativada" : "desativada"
+                    } com sucesso.`,
             });
         },
         onError: (error: any) => {
@@ -919,7 +918,7 @@ const ClinicSettings = () => {
 
     return (
         <div className="min-h-screen bg-background">
-            {}
+            { }
             <header className="bg-white border-b border-border sticky top-0 z-50">
                 <div className="container mx-auto px-4 py-4">
                     <div className="flex items-center gap-4">
@@ -943,18 +942,19 @@ const ClinicSettings = () => {
                 </div>
             </header>
 
-            {}
+            { }
             <div className="container mx-auto px-4 py-6">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="grid w-full grid-cols-5 mb-6">
+                    <TabsList className="grid w-full grid-cols-6 mb-6">
                         <TabsTrigger value="profile">Perfil</TabsTrigger>
                         <TabsTrigger value="hours">Horários</TabsTrigger>
+                        <TabsTrigger value="services">Serviços</TabsTrigger>
                         <TabsTrigger value="payments">Pagamentos</TabsTrigger>
                         <TabsTrigger value="security">Segurança</TabsTrigger>
                         <TabsTrigger value="team">Equipe</TabsTrigger>
                     </TabsList>
 
-                    {}
+                    { }
                     <TabsContent value="profile" className="space-y-6">
                         <Card className="p-6">
                             <div className="flex items-center gap-2 mb-6">
@@ -965,7 +965,7 @@ const ClinicSettings = () => {
                             </div>
 
                             <div className="space-y-6">
-                                {}
+                                { }
                                 <div className="flex items-center gap-6">
                                     <Avatar className="h-24 w-24">
                                         <AvatarImage
@@ -1013,7 +1013,7 @@ const ClinicSettings = () => {
 
                                 <Separator />
 
-                                {}
+                                { }
                                 {clinicLoading ? (
                                     <p className="text-vet-neutral text-center py-4">
                                         Carregando dados da clínica...
@@ -1160,7 +1160,7 @@ const ClinicSettings = () => {
                         </Card>
                     </TabsContent>
 
-                    {}
+                    { }
                     <TabsContent value="hours" className="space-y-6">
                         <Card className="p-6">
                             <div className="flex items-center gap-2 mb-6">
@@ -1195,13 +1195,13 @@ const ClinicSettings = () => {
                                                             (prev) =>
                                                                 prev.map((h) =>
                                                                     h.day ===
-                                                                    schedule.day
+                                                                        schedule.day
                                                                         ? {
-                                                                              ...h,
-                                                                              open: e
-                                                                                  .target
-                                                                                  .value,
-                                                                          }
+                                                                            ...h,
+                                                                            open: e
+                                                                                .target
+                                                                                .value,
+                                                                        }
                                                                         : h
                                                                 )
                                                         )
@@ -1220,13 +1220,13 @@ const ClinicSettings = () => {
                                                             (prev) =>
                                                                 prev.map((h) =>
                                                                     h.day ===
-                                                                    schedule.day
+                                                                        schedule.day
                                                                         ? {
-                                                                              ...h,
-                                                                              close: e
-                                                                                  .target
-                                                                                  .value,
-                                                                          }
+                                                                            ...h,
+                                                                            close: e
+                                                                                .target
+                                                                                .value,
+                                                                        }
                                                                         : h
                                                                 )
                                                         )
@@ -1241,12 +1241,12 @@ const ClinicSettings = () => {
                                                     setOperatingHours((prev) =>
                                                         prev.map((h) =>
                                                             h.day ===
-                                                            schedule.day
+                                                                schedule.day
                                                                 ? {
-                                                                      ...h,
-                                                                      enabled:
-                                                                          checked,
-                                                                  }
+                                                                    ...h,
+                                                                    enabled:
+                                                                        checked,
+                                                                }
                                                                 : h
                                                         )
                                                     )
@@ -1356,14 +1356,19 @@ const ClinicSettings = () => {
                             >
                                 <Save className="h-4 w-4 mr-2" />
                                 {updateHoursMutation.isPending ||
-                                updateDurationsMutation.isPending
+                                    updateDurationsMutation.isPending
                                     ? "Salvando..."
                                     : "Salvar Horários"}
                             </Button>
                         </Card>
                     </TabsContent>
 
-                    {}
+                    {/* Services Tab */}
+                    <TabsContent value="services" className="space-y-6">
+                        <ServiceManagement />
+                    </TabsContent>
+
+                    { }
                     <TabsContent value="payments" className="space-y-6">
                         <Card className="p-6">
                             <div className="flex items-center gap-2 mb-6">
@@ -1393,12 +1398,12 @@ const ClinicSettings = () => {
                                                     setPaymentMethods((prev) =>
                                                         prev.map((pm) =>
                                                             pm.method ===
-                                                            payment.method
+                                                                payment.method
                                                                 ? {
-                                                                      ...pm,
-                                                                      enabled:
-                                                                          checked,
-                                                                  }
+                                                                    ...pm,
+                                                                    enabled:
+                                                                        checked,
+                                                                }
                                                                 : pm
                                                         )
                                                     )
@@ -1487,14 +1492,14 @@ const ClinicSettings = () => {
                             >
                                 <Save className="h-4 w-4 mr-2" />
                                 {updatePaymentMethodsMutation.isPending ||
-                                updateBillingInfoMutation.isPending
+                                    updateBillingInfoMutation.isPending
                                     ? "Salvando..."
                                     : "Salvar Configurações"}
                             </Button>
                         </Card>
                     </TabsContent>
 
-                    {}
+                    { }
                     <TabsContent value="security" className="space-y-6">
                         <Card className="p-6">
                             <div className="flex items-center gap-2 mb-6">
@@ -1670,7 +1675,7 @@ const ClinicSettings = () => {
                         </Card>
                     </TabsContent>
 
-                    {}
+                    { }
                     <TabsContent value="team" className="space-y-6">
                         <Card className="p-6">
                             <div className="flex items-center justify-between mb-6">
@@ -1719,7 +1724,7 @@ const ClinicSettings = () => {
                                                                 membersInRole.length
                                                             }{" "}
                                                             {membersInRole.length ===
-                                                            1
+                                                                1
                                                                 ? "membro"
                                                                 : "membros"}
                                                         </span>
@@ -1746,7 +1751,7 @@ const ClinicSettings = () => {
                 </Tabs>
             </div>
 
-            {}
+            { }
             <RolePermissionsModal
                 open={showRoleModal}
                 onOpenChange={setShowRoleModal}
