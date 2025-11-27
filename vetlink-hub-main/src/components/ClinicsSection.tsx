@@ -27,7 +27,8 @@ const ClinicsSection = ({ searchResults, isSearchMode = false, onViewAll }: Clin
     if (isSearchMode && onViewAll) {
       setIsLoadingAll(true);
       try {
-        const clinics = await api.getClinics({ limit: 100 });
+        const response = await api.getClinics({ limit: 100 });
+        const clinics = Array.isArray(response) ? response : (response as any).data || [];
         setAllClinics(clinics);
         if (onViewAll) {
           onViewAll();
@@ -55,15 +56,16 @@ const ClinicsSection = ({ searchResults, isSearchMode = false, onViewAll }: Clin
       specialties: clinic.specialties || [],
       image: clinic.photo_url || clinic1,
       isOpen: clinic.is_open !== undefined ? clinic.is_open : true,
-      isRegistered: clinic.isRegistered !== undefined ? clinic.isRegistered : true
+      isRegistered: clinic.isRegistered !== undefined ? clinic.isRegistered : true,
+      googleMapsUrl: clinic.googleMapsUrl
     };
   };
 
   const clinicsToShow = isSearchMode && searchResults
     ? searchResults.map(formatClinicForCard)
     : isSearchMode && allClinics.length > 0
-    ? allClinics.map(formatClinicForCard)
-    : defaultClinics.map(formatClinicForCard);
+      ? allClinics.map(formatClinicForCard)
+      : defaultClinics.map(formatClinicForCard);
 
   return (
     <section id="clinics-section" className="py-20 bg-white/50">

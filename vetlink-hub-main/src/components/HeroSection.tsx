@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MapPin, Search, Star, Loader2 } from "lucide-react";
+import { MapPin, Search, Star, Loader2, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import heroImage from "@/assets/hero-vet.jpg";
 import api from "@/services/api";
+import { getUserLocation } from "@/services/googleMapsService";
 
 interface HeroSectionProps {
   onSearchResults?: (results: any[]) => void;
@@ -13,56 +14,50 @@ interface HeroSectionProps {
 const HeroSection = ({ onSearchResults }: HeroSectionProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
-  const validateCep = (cep: string): boolean => {
-    const cleanCep = cep.replace(/\D/g, '');
-    return cleanCep.length === 8;
-  };
-
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      toast.error("Por favor, digite um CEP ou cidade");
-      return;
-    }
-
+  const performSearch = async (latitude: number, longitude: number) => {
     setIsSearching(true);
     try {
-      const cleanQuery = searchQuery.replace(/\D/g, '');
-      let latitude: number | undefined;
-      let longitude: number | undefined;
+      // Import Google Maps service functions
+      const { searchNearbyVeterinaryClinics, calculateDistance } = await import('@/services/googleMapsService');
 
-      if (cleanQuery.length === 8) {
-        const cepData = await api.getCepCoordinates(cleanQuery);
-        if (!cepData.latitude || !cepData.longitude) {
-          toast.error("Não foi possível obter as coordenadas para este CEP");
-          setIsSearching(false);
-          return;
-        }
-        latitude = cepData.latitude;
-        longitude = cepData.longitude;
-      } else {
-        toast.error("Por favor, digite um CEP válido (8 dígitos)");
-        setIsSearching(false);
-        return;
-      }
-
-      const [registeredClinics, externalClinics] = await Promise.all([
-        api.searchClinicsByLocation(latitude, longitude, 10, 3),
-        api.searchExternalClinics(latitude, longitude, 10000, 3)
+      // Search both database clinics and Google Places in parallel
+      const [dbResponse, googleClinics] = await Promise.all([
+        api.searchClinicsByLocation(latitude, longitude, 10, 20).catch(() => ({ data: [] })),
+        searchNearbyVeterinaryClinics(latitude, longitude, 5000).catch(() => [])
       ]);
 
-      const allResults = [...registeredClinics, ...externalClinics];
+      // Extract clinics array from response (handle both array and {data: []} formats)
+      const dbClinics = Array.isArray(dbResponse) ? dbResponse : (dbResponse?.data || []);
 
-      const limitedResults = allResults.slice(0, 3);
+      // Add distance to database clinics
+      const dbClinicsWithDistance = dbClinics.map((clinic: any) => ({
+        ...clinic,
+        isRegistered: true,
+        distance: calculateDistance(latitude, longitude, clinic.latitude || 0, clinic.longitude || 0)
+      }));
 
-      if (limitedResults.length === 0) {
+      // Add distance to Google clinics  
+      const googleClinicsWithDistance = googleClinics.map(clinic => ({
+        ...clinic,
+        distance: calculateDistance(latitude, longitude, clinic.latitude, clinic.longitude)
+      }));
+
+      // Merge and sort by distance
+      const allClinics = [...dbClinicsWithDistance, ...googleClinicsWithDistance];
+      const sortedClinics = allClinics.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+
+      if (sortedClinics.length === 0) {
         toast.info("Nenhuma clínica encontrada nesta região");
       } else {
-        toast.success(`${limitedResults.length} clínica(s) encontrada(s)`);
+        const dbCount = dbClinicsWithDistance.length;
+        const googleCount = googleClinicsWithDistance.length;
+        toast.success(`${sortedClinics.length} clínica(s) encontrada(s) (${dbCount} cadastradas + ${googleCount} do Google)`);
       }
 
       if (onSearchResults) {
-        onSearchResults(limitedResults);
+        onSearchResults(sortedClinics);
       }
 
       setTimeout(() => {
@@ -75,6 +70,60 @@ const HeroSection = ({ onSearchResults }: HeroSectionProps) => {
       console.error('Error searching clinics:', error);
       toast.error(error.message || "Erro ao buscar clínicas");
     } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleUseMyLocation = async () => {
+    setIsGettingLocation(true);
+    try {
+      const { latitude, longitude } = await getUserLocation();
+      toast.success("Localização obtida com sucesso!");
+      await performSearch(latitude, longitude);
+    } catch (error: any) {
+      console.error('Error getting location:', error);
+      toast.error(error.message || "Erro ao obter localização");
+    } finally {
+      setIsGettingLocation(false);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      toast.error("Por favor, digite um CEP");
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const cleanQuery = searchQuery.replace(/\D/g, '');
+
+      if (cleanQuery.length === 8) {
+        try {
+          // Use frontend geocoding service instead of backend API
+          const { getCoordinatesFromCep } = await import('@/services/googleMapsService');
+          const coordinates = await getCoordinatesFromCep(cleanQuery);
+
+          if (!coordinates) {
+            toast.error("CEP não encontrado ou inválido");
+            setIsSearching(false);
+            return;
+          }
+
+          const { latitude, longitude } = coordinates;
+          await performSearch(latitude, longitude);
+        } catch (cepError) {
+          console.error('CEP Error:', cepError);
+          toast.error("Erro ao buscar CEP");
+          setIsSearching(false);
+        }
+      } else {
+        toast.error("Por favor, digite um CEP válido (8 dígitos)");
+        setIsSearching(false);
+      }
+    } catch (error: any) {
+      console.error('Error searching clinics:', error);
+      toast.error(error.message || "Erro ao buscar clínicas");
       setIsSearching(false);
     }
   };
@@ -113,12 +162,12 @@ const HeroSection = ({ onSearchResults }: HeroSectionProps) => {
                   <div className="relative flex-1">
                     <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-vet-neutral h-5 w-5" />
                     <Input
-                      placeholder="Digite sua cidade ou CEP"
+                      placeholder="Digite seu CEP"
                       className="pl-10 h-12 border-border/50 focus:border-vet-primary"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyPress={handleKeyPress}
-                      disabled={isSearching}
+                      disabled={isSearching || isGettingLocation}
                     />
                   </div>
                   <Button
@@ -126,7 +175,7 @@ const HeroSection = ({ onSearchResults }: HeroSectionProps) => {
                     size="lg"
                     className="h-12 px-8"
                     onClick={handleSearch}
-                    disabled={isSearching}
+                    disabled={isSearching || isGettingLocation}
                   >
                     {isSearching ? (
                       <>
@@ -141,6 +190,32 @@ const HeroSection = ({ onSearchResults }: HeroSectionProps) => {
                     )}
                   </Button>
                 </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-px bg-border/30"></div>
+                  <span className="text-xs text-vet-neutral">ou</span>
+                  <div className="flex-1 h-px bg-border/30"></div>
+                </div>
+
+                <Button
+                  variant="vetOutline"
+                  size="lg"
+                  className="w-full h-12"
+                  onClick={handleUseMyLocation}
+                  disabled={isSearching || isGettingLocation}
+                >
+                  {isGettingLocation ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      Obtendo localização...
+                    </>
+                  ) : (
+                    <>
+                      <Navigation className="h-5 w-5 mr-2" />
+                      Usar minha localização
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
 
