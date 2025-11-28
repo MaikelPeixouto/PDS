@@ -5,12 +5,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.searchExternalClinicsController = exports.searchClinicsByLocationController = exports.getCepCoordinatesController = exports.getClinicStatisticsController = exports.getClinicByIdController = exports.getClinicsController = void 0;
 const Clinic_1 = require("../models/Clinic");
+const OperatingHours_1 = require("../models/OperatingHours");
 const database_1 = __importDefault(require("../config/database"));
+
 const getClinicsController = async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 10;
         const offset = parseInt(req.query.offset) || 0;
-        const clinics = await Clinic_1.ClinicModel.findAll(limit, offset);
+        const search = req.query.search || '';
+        const clinics = await Clinic_1.ClinicModel.findAll(limit, offset, search);
         res.status(200).json({
             success: true,
             data: clinics.map(clinic => {
@@ -28,6 +31,7 @@ const getClinicsController = async (req, res) => {
     }
 };
 exports.getClinicsController = getClinicsController;
+
 const getClinicByIdController = async (req, res) => {
     try {
         const { id } = req.params;
@@ -38,10 +42,48 @@ const getClinicByIdController = async (req, res) => {
                 message: 'Clínica não encontrada'
             });
         }
+
+        // Calculate is_open status
+        const operatingHours = await OperatingHours_1.OperatingHoursModel.findByClinicId(id);
+        let isOpen = false;
+
+        if (operatingHours && operatingHours.length > 0) {
+            const now = new Date();
+            // Adjust for Brazil timezone (UTC-3) if needed, or rely on server time. 
+            // For now, let's log to see what's happening.
+            console.log('Current Server Time:', now.toString());
+
+            const days = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+            const currentDay = days[now.getDay()];
+            console.log('Current Day:', currentDay);
+
+            // Normalize day comparison
+            const todaySchedule = operatingHours.find(h => h.day_of_week.toLowerCase() === currentDay.toLowerCase());
+            console.log('Today Schedule:', todaySchedule);
+
+            if (todaySchedule && todaySchedule.is_open && todaySchedule.open_time && todaySchedule.close_time) {
+                const currentTime = now.getHours() * 60 + now.getMinutes();
+                console.log('Current Time (minutes):', currentTime);
+
+                const [openHour, openMinute] = todaySchedule.open_time.split(':').map(Number);
+                const [closeHour, closeMinute] = todaySchedule.close_time.split(':').map(Number);
+
+                const openTime = openHour * 60 + openMinute;
+                const closeTime = closeHour * 60 + closeMinute;
+
+                if (currentTime >= openTime && currentTime < closeTime) {
+                    isOpen = true;
+                }
+            }
+        }
+
         const { password_hash, ...clinicResponse } = clinic;
         res.status(200).json({
             success: true,
-            data: clinicResponse
+            data: {
+                ...clinicResponse,
+                is_open: isOpen
+            }
         });
     }
     catch (error) {

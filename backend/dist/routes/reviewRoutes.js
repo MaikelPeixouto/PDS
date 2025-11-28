@@ -8,7 +8,7 @@ const router = (0, express_1.Router)();
 router.post('/', [
     authMiddleware_1.authMiddleware,
     (0, express_validator_1.body)('clinicId').isUUID().withMessage('Valid clinic ID is required'),
-    (0, express_validator_1.body)('appointmentId').optional().isUUID().withMessage('Valid appointment ID is required'),
+    (0, express_validator_1.body)('appointmentId').optional({ nullable: true }).isUUID().withMessage('Valid appointment ID is required'),
     (0, express_validator_1.body)('rating').isInt({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
     (0, express_validator_1.body)('comment').notEmpty().trim().withMessage('Comment is required'),
 ], reviewController_1.createReviewController);

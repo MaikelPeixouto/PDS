@@ -24,21 +24,22 @@ exports.createAppointment = createAppointment;
 const findAppointmentById = async (id) => {
     const result = await database_1.default.query(`SELECT
     a.*,
-    p.name as pet_name,
-    p.species as pet_species,
+    COALESCE(p.name, a.pet_name) as pet_name,
+    COALESCE(p.species, a.pet_type) as pet_species,
     p.age as pet_age,
     u.first_name as user_first_name,
     u.last_name as user_last_name,
+    COALESCE(u.first_name || ' ' || u.last_name, a.client_name) as client_name_display,
     u.email as user_email,
-    u.phone as user_phone,
+    COALESCE(u.phone, a.client_phone) as user_phone,
     c.name as clinic_name,
     CONCAT(v.first_name, ' ', v.last_name) as veterinarian_name,
     s.name as service_name,
     s.price as service_price,
     s.duration_minutes as service_duration
     FROM vet_appointments a
-    JOIN vet_pets p ON a.pet_id = p.id
-    JOIN users u ON a.user_id = u.id
+    LEFT JOIN vet_pets p ON a.pet_id = p.id
+    LEFT JOIN users u ON a.user_id = u.id
     JOIN clinics c ON a.clinic_id = c.id
     LEFT JOIN vet_veterinarians v ON a.veterinarian_id = v.id
     JOIN vet_services s ON a.service_id = s.id
@@ -70,7 +71,7 @@ const findAppointmentsByClinicId = async (clinicId) => {
     const result = await database_1.default.query(`SELECT
     a.*,
     COALESCE(p.name, a.pet_name) as pet_name,
-    p.species as pet_species,
+    COALESCE(p.species, a.pet_type) as pet_species,
     COALESCE(u.first_name || ' ' || u.last_name, a.client_name) as user_name,
     a.client_phone,
     c.name as clinic_name,
@@ -92,15 +93,15 @@ exports.findAppointmentsByClinicId = findAppointmentsByClinicId;
 const findAppointmentsByDateRange = async (clinicId, startDate, endDate) => {
     const result = await database_1.default.query(`SELECT
       a.*,
-      p.name as pet_name,
-      p.species as pet_species,
+      COALESCE(p.name, a.pet_name) as pet_name,
+      COALESCE(p.species, a.pet_type) as pet_species,
       c.name as clinic_name,
       CONCAT(v.first_name, ' ', v.last_name) as veterinarian_name,
       s.name as service_name,
       s.price as service_price,
       s.duration_minutes as service_duration
     FROM vet_appointments a
-    JOIN vet_pets p ON a.pet_id = p.id
+    LEFT JOIN vet_pets p ON a.pet_id = p.id
     JOIN clinics c ON a.clinic_id = c.id
     LEFT JOIN vet_veterinarians v ON a.veterinarian_id = v.id
     JOIN vet_services s ON a.service_id = s.id
@@ -140,13 +141,9 @@ const findAvailableTimeSlots = async (clinicId, date, veterinarianId) => {
     const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
     const appointmentDate = new Date(date);
     const dayOfWeek = dayNames[appointmentDate.getDay()];
-    console.log(`[findAvailableTimeSlots] Date: ${date}, Day of week: ${dayOfWeek}, Clinic ID: ${clinicId}`);
     const operatingHours = await OperatingHours_1.OperatingHoursModel.findByClinicId(clinicId);
-    console.log(`[findAvailableTimeSlots] Operating hours found: ${operatingHours.length}`);
     const dayHours = operatingHours.find((h) => h.day_of_week === dayOfWeek);
-    console.log(`[findAvailableTimeSlots] Day hours for ${dayOfWeek}:`, dayHours ? { is_open: dayHours.is_open, open_time: dayHours.open_time, close_time: dayHours.close_time } : 'NOT FOUND');
     if (!dayHours || !dayHours.is_open || !dayHours.open_time || !dayHours.close_time) {
-        console.log(`[findAvailableTimeSlots] Clinic is closed on ${dayOfWeek}, returning empty array`);
         return [];
     }
     const [openHour, openMinute] = dayHours.open_time.split(':').map(Number);

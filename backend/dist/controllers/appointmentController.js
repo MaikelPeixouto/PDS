@@ -131,16 +131,12 @@ const getUserAppointmentsController = async (req, res) => {
 };
 exports.getUserAppointmentsController = getUserAppointmentsController;
 const getClinicAppointmentsController = async (req, res) => {
-    console.log('[getClinicAppointmentsController] req.clinic:', req.clinic ? { id: req.clinic.id, name: req.clinic.name } : 'NOT FOUND');
-    console.log('[getClinicAppointmentsController] req.user:', req.user ? { id: req.user.id } : 'NOT FOUND');
     if (!req.clinic) {
         return res.status(401).json({ message: 'Authentication required' });
     }
     try {
         const clinicId = req.clinic.id;
-        console.log('[getClinicAppointmentsController] Fetching appointments for clinic:', clinicId);
         const appointments = await (0, Appointment_1.findAppointmentsByClinicId)(clinicId);
-        console.log('[getClinicAppointmentsController] Found appointments:', appointments.length);
         res.status(200).json({
             message: 'Appointments retrieved successfully',
             appointments: appointments.map(appointment => ({
@@ -215,8 +211,8 @@ const getAppointmentByIdController = async (req, res) => {
                 pet_name: appointment.pet_name,
                 pet_species: appointment.pet_species,
                 pet_age: appointment.pet_age,
-                user_first_name: appointment.user_first_name,
-                user_last_name: appointment.user_last_name,
+                user_first_name: appointment.user_first_name || (appointment.client_name_display ? appointment.client_name_display.split(' ')[0] : ''),
+                user_last_name: appointment.user_last_name || (appointment.client_name_display ? appointment.client_name_display.split(' ').slice(1).join(' ') : ''),
                 user_email: appointment.user_email,
                 user_phone: appointment.user_phone,
                 clinic_name: appointment.clinic_name,

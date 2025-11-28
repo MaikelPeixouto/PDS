@@ -88,13 +88,22 @@ class ClinicModel {
         const result = await database_1.default.query(query, [cnpj]);
         return result.rows.length > 0;
     }
-    static async findAll(limit = 10, offset = 0) {
-        const query = `
+    static async findAll(limit = 10, offset = 0, search = '') {
+        let query = `
       SELECT * FROM clinics
+    `;
+        const params = [limit, offset];
+
+        if (search) {
+            query += ` WHERE name ILIKE $3`;
+            params.push(`%${search}%`);
+        }
+
+        query += `
       ORDER BY rating DESC, total_reviews DESC
       LIMIT $1 OFFSET $2
     `;
-        const result = await database_1.default.query(query, [limit, offset]);
+        const result = await database_1.default.query(query, params);
         return result.rows;
     }
     static async findByLocation(latitude, longitude, radius = 10) {

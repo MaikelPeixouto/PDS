@@ -38,6 +38,24 @@ const createReviewController = async (req, res) => {
             if (existingReview) {
                 return res.status(400).json({ message: 'You have already reviewed this appointment' });
             }
+        } else {
+            // If no appointment is linked, check if user already reviewed this clinic generally (optional constraint, but good for anti-spam)
+            // For now, let's allow it but maybe we should check if they have ANY review for this clinic without appointment?
+            // Let's stick to the user request: "quero poder fazer uma avaliação da clínica mesmo sem ter um consulta concluída"
+
+            // However, we should probably prevent spamming. Let's check if they already reviewed this clinic recently? 
+            // Or just check if they have a review for this clinic that is NOT linked to an appointment?
+            // The current unique constraint in DB might be (user_id, clinic_id, appointment_id). 
+            // If appointment_id is NULL, the unique constraint might allow multiple NULLs depending on DB.
+            // But usually we want 1 review per clinic per user if not per appointment.
+
+            // Let's check if there is already a review by this user for this clinic where appointment_id is NULL
+            const existingReview = await (0, Review_1.getReviewByUserAndClinic)(req.user.id, clinicId, null);
+            if (existingReview) {
+                // If they already reviewed without an appointment, maybe we update it? Or block?
+                // For simplicity, let's block and say "You already reviewed this clinic".
+                return res.status(400).json({ message: 'You have already reviewed this clinic' });
+            }
         }
         const review = await (0, Review_1.createReview)(clinicId, req.user.id, appointmentId || null, rating, comment.trim());
         res.status(201).json({
