@@ -22,7 +22,16 @@ dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3000;
 app.use((0, cors_1.default)({
-    origin: process.env.FRONTEND_URL || ['http://localhost:5173', 'http://localhost:8080'],
+    origin: (origin, callback) => {
+        const allowedOrigins = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : ['http://localhost:5173', 'http://localhost:8080'];
+        // Allow requests with no origin (like mobile apps or curl requests), allowed origins, and any Vercel preview URL
+        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+            callback(null, true);
+        } else {
+            console.log('Blocked by CORS:', origin);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
 }));
 app.use(express_1.default.json({ limit: '10mb' }));
