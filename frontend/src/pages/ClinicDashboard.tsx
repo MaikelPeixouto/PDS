@@ -210,7 +210,9 @@ const ClinicDashboard = () => {
     address: user?.address || "",
     phone: user?.phone || "",
     email: user?.email || "",
-    avatar: "/placeholder.svg"
+    avatar: user?.avatar || user?.photo || user?.photo_url || "/placeholder.svg",
+    photo: user?.photo,
+    photo_url: user?.photo_url
   };
 
   const metrics = [
@@ -271,12 +273,14 @@ const ClinicDashboard = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Avatar className="h-12 w-12">
-                <AvatarImage src={clinicData.avatar} alt={clinicData.name} />
-                <AvatarFallback className="bg-vet-primary text-white">PC</AvatarFallback>
+                <AvatarImage src={clinicData.avatar || clinicData.photo || clinicData.photo_url || "/placeholder.svg"} alt={clinicData.name} />
+                <AvatarFallback className="bg-vet-primary text-white">
+                  {clinicData.name.substring(0, 2).toUpperCase()}
+                </AvatarFallback>
               </Avatar>
               <div>
                 <h1 className="text-xl font-bold text-foreground">{clinicData?.name || "Clínica"}</h1>
-                {clinicData?.rating && (
+                {!!clinicData?.rating && clinicData.rating > 0 && (
                   <div className="flex items-center gap-2 text-sm text-vet-neutral">
                     <Star className="h-4 w-4 fill-vet-warning text-vet-warning" />
                     {clinicData.rating} {clinicData.reviews ? `(${clinicData.reviews} avaliações)` : ''}
